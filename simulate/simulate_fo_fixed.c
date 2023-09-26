@@ -57,12 +57,14 @@ void sort_by_key_int_wrapper(int *data, int *value, int N);
 void simulate_fo_fixed(particle_queue* pq, sim_data* sim) {
     int cycle[NSIMD]  __memalign__; // Flag indigating whether a new marker was initialized
     real hin[NSIMD]  __memalign__;  // Time step
+    real hinbis[NSIMD]  __memalign__;  // Time step                                                                                                                                                                                                       
 
     real cputime, cputime_last; // Global cpu time: recent and previous record
 
     particle_simd_fo p;  // This array holds current states
     particle_simd_fo p0; // This array stores previous states
-
+    particle_simd_fo pbis;  // This array holds current states                                                                                                                                                                                            
+    particle_simd_fo p0bis; // This array stores previous states      
     /* Init dummy markers */
     for(int i=0; i< NSIMD; i++) {
         p.id[i] = -1;
@@ -77,7 +79,7 @@ void simulate_fo_fixed(particle_queue* pq, sim_data* sim) {
     for(int i = 0; i < NSIMD; i++) {
         if(cycle[i] > 0) {
             hin[i] = simulate_fo_fixed_inidt(sim, &p, i);
-
+	    hinbis[i] = hin[i];
         }
     }
 
@@ -94,8 +96,12 @@ void simulate_fo_fixed(particle_queue* pq, sim_data* sim) {
     int diag_data_field_size = sim->diag_data.diagorb.Nmrk*sim->diag_data.diagorb.Npnt;
     particle_simd_fo *p_ptr=&p;
     particle_simd_fo *p0_ptr=&p0;
+    particle_simd_fo *pbis_ptr=&pbis;
+    particle_simd_fo *p0bis_ptr=&p0bis;
     B_field_data* Bdata = &sim->B_data;
     E_field_data* Edata = &sim->E_data;
+    real* hin_ptr = hin;    
+    real* hinbis_ptr = hinbis;    
     particle_loc  p_loc;
     int sort_index[NSIMD];
     int ps[NSIMD];
@@ -123,7 +129,17 @@ void simulate_fo_fixed(particle_queue* pq, sim_data* sim) {
 		      p0_ptr->B_phi[0:NSIMD],p0_ptr->B_phi_dr[0:NSIMD],p0_ptr->B_phi_dphi[0:NSIMD],p0_ptr->B_phi_dz[0:NSIMD],p0_ptr->B_z[0:NSIMD],p0_ptr->B_z_dr[0:NSIMD],p0_ptr->B_z_dphi[0:NSIMD], \
 		      p0_ptr->B_z_dz[0:NSIMD],p0_ptr->rho[0:NSIMD],p0_ptr->theta[0:NSIMD],p0_ptr->err[0:NSIMD],p0_ptr->time[0:NSIMD],p0_ptr->weight[0:NSIMD],p0_ptr->cputime[0:NSIMD],	\
 		      p0_ptr->id[0:NSIMD],p0_ptr->endcond[0:NSIMD],p0_ptr->walltile[0:NSIMD],p0_ptr->index[0:NSIMD],p0_ptr->znum[0:NSIMD],p0_ptr->anum[0:NSIMD],p0_ptr->bounces[0:NSIMD], \
-		      hin[0:NSIMD],sort_index[0:NSIMD],ps[0:NSIMD],\
+  		      pbis_ptr[0:1],pbis_ptr->running[0:NSIMD],pbis_ptr->r[0:NSIMD],pbis_ptr->phi[0:NSIMD],pbis_ptr->p_r[0:NSIMD],pbis_ptr->p_phi[0:NSIMD],pbis_ptr->p_z[0:NSIMD],pbis_ptr->mileage[0:NSIMD], \
+		      pbis_ptr->z[0:NSIMD],pbis_ptr->charge[0:NSIMD],pbis_ptr->mass[0:NSIMD],pbis_ptr->B_r[0:NSIMD],pbis_ptr->B_r_dr[0:NSIMD],pbis_ptr->B_r_dphi[0:NSIMD],pbis_ptr->B_r_dz[0:NSIMD],	\
+		      pbis_ptr->B_phi[0:NSIMD],pbis_ptr->B_phi_dr[0:NSIMD],pbis_ptr->B_phi_dphi[0:NSIMD],pbis_ptr->B_phi_dz[0:NSIMD],pbis_ptr->B_z[0:NSIMD],pbis_ptr->B_z_dr[0:NSIMD],pbis_ptr->B_z_dphi[0:NSIMD], \
+		      pbis_ptr->B_z_dz[0:NSIMD],pbis_ptr->rho[0:NSIMD],pbis_ptr->theta[0:NSIMD],pbis_ptr->err[0:NSIMD],pbis_ptr->time[0:NSIMD],pbis_ptr->weight[0:NSIMD],pbis_ptr->cputime[0:NSIMD],	\
+		      pbis_ptr->id[0:NSIMD],pbis_ptr->endcond[0:NSIMD],pbis_ptr->walltile[0:NSIMD],pbis_ptr->index[0:NSIMD],pbis_ptr->znum[0:NSIMD],pbis_ptr->anum[0:NSIMD],pbis_ptr->bounces[0:NSIMD], \
+  		      p0bis_ptr[0:1],p0bis_ptr->running[0:NSIMD],p0bis_ptr->r[0:NSIMD],p0bis_ptr->phi[0:NSIMD],p0bis_ptr->p_r[0:NSIMD],p0bis_ptr->p_phi[0:NSIMD],p0bis_ptr->p_z[0:NSIMD],p0bis_ptr->mileage[0:NSIMD], \
+		      p0bis_ptr->z[0:NSIMD],p0bis_ptr->charge[0:NSIMD],p0bis_ptr->mass[0:NSIMD],p0bis_ptr->B_r[0:NSIMD],p0bis_ptr->B_r_dr[0:NSIMD],p0bis_ptr->B_r_dphi[0:NSIMD],p0bis_ptr->B_r_dz[0:NSIMD],	\
+		      p0bis_ptr->B_phi[0:NSIMD],p0bis_ptr->B_phi_dr[0:NSIMD],p0bis_ptr->B_phi_dphi[0:NSIMD],p0bis_ptr->B_phi_dz[0:NSIMD],p0bis_ptr->B_z[0:NSIMD],p0bis_ptr->B_z_dr[0:NSIMD],p0bis_ptr->B_z_dphi[0:NSIMD], \
+		      p0bis_ptr->B_z_dz[0:NSIMD],p0bis_ptr->rho[0:NSIMD],p0bis_ptr->theta[0:NSIMD],p0bis_ptr->err[0:NSIMD],p0bis_ptr->time[0:NSIMD],p0bis_ptr->weight[0:NSIMD],p0bis_ptr->cputime[0:NSIMD],	\
+		      p0bis_ptr->id[0:NSIMD],p0bis_ptr->endcond[0:NSIMD],p0bis_ptr->walltile[0:NSIMD],p0bis_ptr->index[0:NSIMD],p0bis_ptr->znum[0:NSIMD],p0bis_ptr->anum[0:NSIMD],p0bis_ptr->bounces[0:NSIMD], \
+		      hin[0:NSIMD],hinbis[0:NSIMD],sort_index[0:NSIMD],ps[0:NSIMD],\
 		      Bdata[0:1],Bdata->BTC.dB[0:1],Bdata->BSTS.axis_r,Bdata->BSTS.axis_r.c[0:1],Bdata->BSTS.axis_z,Bdata->BSTS.axis_z.c[0:1],Bdata->BSTS.B_r,Bdata->BSTS.B_r.c[0:1], \
 		      Bdata->BSTS.B_z,Bdata->BSTS.B_z.c[0:1],Bdata->BSTS.B_phi,Bdata->BSTS.B_phi.c[0:1],Bdata->B3DS.psi,Bdata->B3DS.psi.c[0:1],Bdata->B3DS.B_r,Bdata->B3DS.B_r.c[0:1], \
 		      Bdata->B3DS.B_phi,Bdata->B3DS.B_phi.c[0:1],Bdata->B3DS.B_z,Bdata->B3DS.B_z.c[0:1],Bdata->B2DS.psi,Bdata->B2DS.psi.c[0:1],Bdata->B2DS.B_r,Bdata->B2DS.B_r.c[0:1], \
@@ -139,8 +155,7 @@ void simulate_fo_fixed(particle_queue* pq, sim_data* sim) {
         #pragma omp simd
 
         GPU_PARALLEL_LOOP_ALL_LEVELS
-	for(int iloc = 0; iloc < n_running; iloc++) {
-	  int i = sort_index[iloc];
+	for(int i = 0; i < NSIMD; i++) {
 	  particle_copy_fo(p_ptr, i, p0_ptr, i);
 	}
         /*************************** Physics **********************************/
@@ -150,7 +165,7 @@ void simulate_fo_fixed(particle_queue* pq, sim_data* sim) {
         GPU_PARALLEL_LOOP_ALL_LEVELS
         for(int i = 0; i < NSIMD; i++) {
             if(sim->reverse_time) {
-                hin[i]  = -hin[i];
+                hin_ptr[i]  = -hin_ptr[i];
             }
         }
 
@@ -160,12 +175,12 @@ void simulate_fo_fixed(particle_queue* pq, sim_data* sim) {
 #ifdef GPU
 	      printf("NOT PORTED TO GPU YET");
 	      exit(0);
-                step_fo_vpa_mhd(&p, hin, &sim->B_data, &sim->E_data,
+                step_fo_vpa_mhd(&p, hin_ptr, &sim->B_data, &sim->E_data,
                                 &sim->boozer_data, &sim->mhd_data);
 #endif
             }
             else {
-	      step_fo_vpa(p_ptr, hin, &sim->B_data, &sim->E_data, n_running, sort_index);
+	      step_fo_vpa(p_ptr, hin_ptr, &sim->B_data, &sim->E_data, n_running, sort_index);
             }
         }
 
@@ -174,7 +189,7 @@ void simulate_fo_fixed(particle_queue* pq, sim_data* sim) {
         GPU_PARALLEL_LOOP_ALL_LEVELS
         for(int i = 0; i < NSIMD; i++) {
             if(sim->reverse_time) {
-                hin[i]  = -hin[i];
+                hin_ptr[i]  = -hin_ptr[i];
             }
         }
 
@@ -183,7 +198,7 @@ void simulate_fo_fixed(particle_queue* pq, sim_data* sim) {
 #ifdef GPU
 	  printf("NOT PORTED TO GPU YET");
 	  exit(0);
-            mccc_fo_euler(p_ptr, hin, &sim->plasma_data, sim->random_data,
+            mccc_fo_euler(p_ptr, hin_ptr, &sim->plasma_data, sim->random_data,
                           &sim->mccc_data);
 #endif
         }
@@ -192,7 +207,7 @@ void simulate_fo_fixed(particle_queue* pq, sim_data* sim) {
 #ifdef GPU
 	  printf("NOT PORTED TO GPU YET");
 	  exit(0);
-            atomic_fo(p_ptr, hin, &sim->plasma_data, &sim->neutral_data,
+            atomic_fo(p_ptr, hin_ptr, &sim->plasma_data, &sim->neutral_data,
                       &sim->random_data, &sim->asigma_data,
                       &sim->enable_atomic);
 #endif
@@ -204,12 +219,10 @@ void simulate_fo_fixed(particle_queue* pq, sim_data* sim) {
         cputime = A5_WTIME;
         #pragma omp simd
         GPU_PARALLEL_LOOP_ALL_LEVELS
-        for(int i = 0; i < NSIMD; i++) {
-            if(p.running[i]){
-                p.time[i]    += ( 1.0 - 2.0 * ( sim->reverse_time > 0 ) ) * hin[i];
-                p.mileage[i] += hin[i];
-                p.cputime[i] += cputime - cputime_last;
-            }
+        for(int i = 0; i < n_running; i++) {
+	  p.time[i]    += ( 1.0 - 2.0 * ( sim->reverse_time > 0 ) ) * hin_ptr[i];
+	  p.mileage[i] += hin_ptr[i];
+	  p.cputime[i] += cputime - cputime_last;
         }
         cputime_last = cputime;
 
@@ -250,19 +263,27 @@ void simulate_fo_fixed(particle_queue* pq, sim_data* sim) {
             diag_update_gc(&sim->diag_data, &sim->B_data, &gc_f, &gc_i);
         }
 
-        /* Update running particles */
+        /* Update, sort and pack running particles */
 #ifdef GPU
-	n_running = 0;
-	GPU_PARALLEL_LOOP_ALL_LEVELS
 	for (int i=0;i<NSIMD;i++) {
-	  ps[i] = -1*p.running[i];
+	  ps[i] = -1*p_ptr->running[i];
 	  sort_index[i] = i;
 	}
 
 #pragma acc host_data use_device(ps,sort_index)
 	{
-	  sort_by_key_int_wrapper(ps,sort_index,NSIMD);
+	  sort_by_key_int_wrapper(ps,sort_index,n_running);
 	}
+
+	GPU_PARALLEL_LOOP_ALL_LEVELS
+	for(int iloc = 0; iloc < NSIMD; iloc++)
+	  {
+	    int i = sort_index[iloc];
+	    particle_copy_fo(p_ptr, i, pbis_ptr, iloc);
+	    particle_copy_fo(p0_ptr, i, p0bis_ptr, iloc);
+	    hinbis[iloc] = hin[i];
+	  }
+	n_running = 0;
 #pragma omp simd reduction(+:n_running)
 #pragma acc parallel loop reduction(+:n_running)
 	for(int i = 0; i < NSIMD; i++)
@@ -271,8 +292,6 @@ void simulate_fo_fixed(particle_queue* pq, sim_data* sim) {
 	  }
 #else
 	n_running = particle_cycle_fo(pq, &p, &sim->B_data, cycle);
-#endif
-#ifndef GPU	
         /* Determine simulation time-step for new particles */
         #pragma omp simd
 	GPU_PARALLEL_LOOP_ALL_LEVELS
@@ -283,6 +302,18 @@ void simulate_fo_fixed(particle_queue* pq, sim_data* sim) {
 	    }
         }
 #endif	
+	particle_simd_fo *p_tmp_ptr;
+	real* hin_tmp_ptr;
+	hin_tmp_ptr = hin_ptr;
+	hin_ptr = hinbis_ptr;
+	hinbis_ptr = hin_tmp_ptr;
+	p_tmp_ptr = p_ptr;
+	p_ptr = pbis_ptr;
+	pbis_ptr = p_tmp_ptr;
+	p_tmp_ptr=p0_ptr;
+	p0_ptr = p0bis_ptr;
+	p0bis_ptr = p_tmp_ptr;
+
     }
     /* All markers simulated! */
 #pragma acc update host( \

@@ -128,8 +128,7 @@ void dist_rho5D_update_fo(dist_rho5D_data* dist, particle_simd_fo* p_f,
 #pragma acc data present(phi[0:NSIMD],theta[0:NSIMD],ppara[0:NSIMD],pperp[0:NSIMD],i_rho[0:NSIMD],i_theta[0:NSIMD],i_phi[0:NSIMD],i_ppara[0:NSIMD],i_pperp[0:NSIMD],i_time[0:NSIMD],i_q[0:NSIMD],ok[0:NSIMD],weight[0:NSIMD])
   {
     GPU_PARALLEL_LOOP_ALL_LEVELS
-      for(int iloc = 0; iloc < n_running; iloc++) {
-	int i = sort_index[iloc];
+      for(int i = 0; i < n_running; i++) {
 	i_rho[i] = floor((p_f->rho[i] - dist->min_rho)
 			 / ((dist->max_rho - dist->min_rho)/dist->n_rho));
 
@@ -190,8 +189,7 @@ void dist_rho5D_update_fo(dist_rho5D_data* dist, particle_simd_fo* p_f,
       }
 
     GPU_PARALLEL_LOOP_ALL_LEVELS
-      for(int iloc = 0; iloc < n_running; iloc++) {
-	int i = sort_index[iloc];
+      for(int i = 0; i < n_running; i++) {
 	if(ok[i]) {
 	  unsigned long index = dist_rho5D_index(i_rho[i], i_theta[i],
 						 i_phi[i], i_ppara[i],

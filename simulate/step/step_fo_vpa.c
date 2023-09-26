@@ -40,8 +40,7 @@ void step_fo_vpa(particle_simd_fo* p, real* h, B_field_data* Bdata,
     #pragma omp simd  aligned(h : 64)
 #pragma acc data present(h[0:NSIMD])
     GPU_PARALLEL_LOOP_ALL_LEVELS
-    for(int iloc = 0; iloc < n_running; iloc++) {
-      int i = sort_index[iloc];
+    for(int i = 0; i < n_running; i++) {
       a5err errflag = 0;
       
       real R0   = p->r[i];

@@ -89,8 +89,7 @@ void endcond_check_fo(particle_simd_fo* p_f, particle_simd_fo* p_i,
 
 #pragma omp simd
   GPU_PARALLEL_LOOP_ALL_LEVELS
-    for(int iloc = 0; iloc < n_running; iloc++) {
-      int i = sort_index[iloc];
+    for(int i = 0; i < n_running; i++) {
       /* Update bounces if pitch changed sign */
       if( (p_i->p_r[i]*p_i->B_r[i] + p_i->p_phi[i]*p_i->B_phi[i]
 	   + p_i->p_z[i]*p_i->B_z[i])

@@ -126,8 +126,7 @@ void dist_6D_update_fo(dist_6D_data* dist, particle_simd_fo* p_f,
 #pragma acc data present(phi[0:NSIMD],i_r[0:NSIMD],i_phi[0:NSIMD],i_z[0:NSIMD],i_pr[0:NSIMD],i_pphi[0:NSIMD],i_pz[0:NSIMD],i_time[0:NSIMD],i_q[0:NSIMD],ok[0:NSIMD],weight[0:NSIMD])
   {
     GPU_PARALLEL_LOOP_ALL_LEVELS
-      for(int iloc = 0; iloc < n_running; iloc++) {
-	int i = sort_index[iloc];
+      for(int i = 0; i < n_running; i++) {
 	i_r[i] = floor((p_f->r[i] - dist->min_r)
 		       / ((dist->max_r - dist->min_r)/dist->n_r));
 
@@ -173,8 +172,7 @@ void dist_6D_update_fo(dist_6D_data* dist, particle_simd_fo* p_f,
       }
     
     GPU_PARALLEL_LOOP_ALL_LEVELS
-      for(int iloc = 0; iloc < n_running; iloc++) {
-	int i = sort_index[iloc];    
+      for(int i = 0; i < n_running; i++) {
         if(ok[i]) {
 	  unsigned long index = dist_6D_index(i_r[i], i_phi[i], i_z[i],
 					      i_pr[i], i_pphi[i], i_pz[i],
