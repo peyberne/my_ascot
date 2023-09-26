@@ -105,8 +105,10 @@ void simulate_fo_fixed(particle_queue* pq, sim_data* sim) {
     particle_loc  p_loc;
     int sort_index[NSIMD];
     int ps[NSIMD];
-    for (int i=0;i<NSIMD;i++)
-      sort_index[i] = i;    
+    for (int i=0;i<NSIMD;i++) {
+      sort_index[i] = i;
+      ps[i] = -1*p_ptr->running[i];
+    }
 #pragma acc enter data copyin(	\
 		      p_loc.r_arr1[0:NSIMD],p_loc.r_arr2[0:NSIMD],p_loc.r_arr3[0:NSIMD],p_loc.r_arr4[0:NSIMD],p_loc.r_arr5[0:NSIMD],p_loc.i_arr1[0:NSIMD],p_loc.i_arr2[0:NSIMD],p_loc.i_arr3[0:NSIMD],p_loc.i_arr4[0:NSIMD],p_loc.i_arr5[0:NSIMD],p_loc.i_arr6[0:NSIMD],p_loc.i_arr7[0:NSIMD],p_loc.i_arr8[0:NSIMD],p_loc.i_arr9[0:NSIMD], \
        		      sim[0:1],		\
@@ -175,7 +177,7 @@ void simulate_fo_fixed(particle_queue* pq, sim_data* sim) {
 #ifdef GPU
 	      printf("NOT PORTED TO GPU YET");
 	      exit(0);
-                step_fo_vpa_mhd(&p, hin_ptr, &sim->B_data, &sim->E_data,
+                step_fo_vpa_mhd(p_ptr, hin_ptr, &sim->B_data, &sim->E_data,
                                 &sim->boozer_data, &sim->mhd_data);
 #endif
             }
@@ -220,9 +222,9 @@ void simulate_fo_fixed(particle_queue* pq, sim_data* sim) {
         #pragma omp simd
         GPU_PARALLEL_LOOP_ALL_LEVELS
         for(int i = 0; i < n_running; i++) {
-	  p.time[i]    += ( 1.0 - 2.0 * ( sim->reverse_time > 0 ) ) * hin_ptr[i];
-	  p.mileage[i] += hin_ptr[i];
-	  p.cputime[i] += cputime - cputime_last;
+	  p_ptr->time[i]    += ( 1.0 - 2.0 * ( sim->reverse_time > 0 ) ) * hin_ptr[i];
+	  p_ptr->mileage[i] += hin_ptr[i];
+	  p_ptr->cputime[i] += cputime - cputime_last;
         }
         cputime_last = cputime;
 
@@ -265,6 +267,7 @@ void simulate_fo_fixed(particle_queue* pq, sim_data* sim) {
 
         /* Update, sort and pack running particles */
 #ifdef GPU
+	GPU_PARALLEL_LOOP_ALL_LEVELS
 	for (int i=0;i<NSIMD;i++) {
 	  ps[i] = -1*p_ptr->running[i];
 	  sort_index[i] = i;
@@ -290,6 +293,7 @@ void simulate_fo_fixed(particle_queue* pq, sim_data* sim) {
 	  {
 	    if(p_ptr->running[i] > 0) n_running++;
 	  }
+	printf("n_running = %d\n",n_running);
 #else
 	n_running = particle_cycle_fo(pq, &p, &sim->B_data, cycle);
         /* Determine simulation time-step for new particles */
