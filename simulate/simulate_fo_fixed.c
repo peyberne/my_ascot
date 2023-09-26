@@ -306,6 +306,7 @@ void simulate_fo_fixed(particle_queue* pq, sim_data* sim) {
 	    }
         }
 #endif	
+	// Swap pointers to particle arrays
 	particle_simd_fo *p_tmp_ptr;
 	real* hin_tmp_ptr;
 	hin_tmp_ptr = hin_ptr;
@@ -322,10 +323,15 @@ void simulate_fo_fixed(particle_queue* pq, sim_data* sim) {
     /* All markers simulated! */
 #pragma acc update host( \
       p_ptr[0:1],p_ptr->running[0:NSIMD],p_ptr->r[0:NSIMD],p_ptr->phi[0:NSIMD],p_ptr->p_r[0:NSIMD],p_ptr->p_phi[0:NSIMD],p_ptr->p_z[0:NSIMD],p_ptr->mileage[0:NSIMD], \
-  p_ptr->z[0:NSIMD],p_ptr->charge[0:NSIMD],p_ptr->mass[0:NSIMD],p_ptr->B_r[0:NSIMD],p_ptr->B_r_dr[0:NSIMD],p_ptr->B_r_dphi[0:NSIMD],p_ptr->B_r_dz[0:NSIMD], \
-  p_ptr->B_phi[0:NSIMD],p_ptr->B_phi_dr[0:NSIMD],p_ptr->B_phi_dphi[0:NSIMD],p_ptr->B_phi_dz[0:NSIMD],p_ptr->B_z[0:NSIMD],p_ptr->B_z_dr[0:NSIMD],p_ptr->B_z_dphi[0:NSIMD], \
-  p_ptr->B_z_dz[0:NSIMD],p_ptr->rho[0:NSIMD],p_ptr->theta[0:NSIMD],p_ptr->err[0:NSIMD],p_ptr->time[0:NSIMD],p_ptr->weight[0:NSIMD],p_ptr->cputime[0:NSIMD], \
-  p_ptr->id[0:NSIMD],p_ptr->endcond[0:NSIMD],p_ptr->walltile[0:NSIMD],p_ptr->index[0:NSIMD],p_ptr->znum[0:NSIMD],p_ptr->anum[0:NSIMD],p_ptr->bounces[0:NSIMD] )
+      p_ptr->z[0:NSIMD],p_ptr->charge[0:NSIMD],p_ptr->mass[0:NSIMD],p_ptr->B_r[0:NSIMD],p_ptr->B_r_dr[0:NSIMD],p_ptr->B_r_dphi[0:NSIMD],p_ptr->B_r_dz[0:NSIMD], \
+      p_ptr->B_phi[0:NSIMD],p_ptr->B_phi_dr[0:NSIMD],p_ptr->B_phi_dphi[0:NSIMD],p_ptr->B_phi_dz[0:NSIMD],p_ptr->B_z[0:NSIMD],p_ptr->B_z_dr[0:NSIMD],p_ptr->B_z_dphi[0:NSIMD], \
+      p_ptr->B_z_dz[0:NSIMD],p_ptr->rho[0:NSIMD],p_ptr->theta[0:NSIMD],p_ptr->err[0:NSIMD],p_ptr->time[0:NSIMD],p_ptr->weight[0:NSIMD],p_ptr->cputime[0:NSIMD], \
+      p_ptr->id[0:NSIMD],p_ptr->endcond[0:NSIMD],p_ptr->walltile[0:NSIMD],p_ptr->index[0:NSIMD],p_ptr->znum[0:NSIMD],p_ptr->anum[0:NSIMD],p_ptr->bounces[0:NSIMD], \
+      pbis_ptr[0:1],pbis_ptr->running[0:NSIMD],pbis_ptr->r[0:NSIMD],pbis_ptr->phi[0:NSIMD],pbis_ptr->p_r[0:NSIMD],pbis_ptr->p_phi[0:NSIMD],pbis_ptr->p_z[0:NSIMD],pbis_ptr->mileage[0:NSIMD], \
+      pbis_ptr->z[0:NSIMD],pbis_ptr->charge[0:NSIMD],pbis_ptr->mass[0:NSIMD],pbis_ptr->B_r[0:NSIMD],pbis_ptr->B_r_dr[0:NSIMD],pbis_ptr->B_r_dphi[0:NSIMD],pbis_ptr->B_r_dz[0:NSIMD], \
+      pbis_ptr->B_phi[0:NSIMD],pbis_ptr->B_phi_dr[0:NSIMD],pbis_ptr->B_phi_dphi[0:NSIMD],pbis_ptr->B_phi_dz[0:NSIMD],pbis_ptr->B_z[0:NSIMD],pbis_ptr->B_z_dr[0:NSIMD],pbis_ptr->B_z_dphi[0:NSIMD], \
+      pbis_ptr->B_z_dz[0:NSIMD],pbis_ptr->rho[0:NSIMD],pbis_ptr->theta[0:NSIMD],pbis_ptr->err[0:NSIMD],pbis_ptr->time[0:NSIMD],pbis_ptr->weight[0:NSIMD],pbis_ptr->cputime[0:NSIMD], \
+      pbis_ptr->id[0:NSIMD],pbis_ptr->endcond[0:NSIMD],pbis_ptr->walltile[0:NSIMD],pbis_ptr->index[0:NSIMD],pbis_ptr->znum[0:NSIMD],pbis_ptr->anum[0:NSIMD],pbis_ptr->bounces[0:NSIMD] )
 #pragma acc exit data copyout(			\
 			      sim[0:1]  )
 
