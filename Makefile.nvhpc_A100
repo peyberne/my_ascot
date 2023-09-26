@@ -134,7 +134,7 @@ HEADERS=ascot5.h math.h consts.h list.h octree.h physlib.h error.h \
 	random.h print.h hdf5_interface.h suzuki.h nbi.h biosaw.h \
 	asigma.h boschhale.h mpi_interface.h libascot_mem.h
 
-OBJS= math.o list.o octree.o error.c \
+OBJS= csort.o math.o list.o octree.o error.c \
 	$(DIAGOBJS)  $(BFOBJS) $(EFOBJS) $(WALLOBJS) \
 	$(MCCCOBJS) $(STEPOBJS) $(SIMOBJS) $(HDF5IOOBJS) \
 	$(PLSOBJS) $(N0OBJS) $(MHDOBJS) $(ASIGMAOBJS) $(LINTOBJS) \
@@ -236,6 +236,9 @@ test_spline: $(UTESTDIR)test_spline.o $(OBJS)
 
 test_asigma: $(UTESTDIR)test_asigma.o $(OBJS)
 	$(CC) -o $@ $^ $(CFLAGS)
+
+%.o: %.cu $(HEADERS) Makefile
+	@$(CUDAC) -c -o $@ $<
 
 %.o: %.c $(HEADERS) Makefile
 	$(CC) -c -o $@ $< $(CFLAGS)

@@ -71,183 +71,181 @@
  * @param sim pointer to simulation data struct
  */
 void endcond_check_fo(particle_simd_fo* p_f, particle_simd_fo* p_i,
-                      sim_data* sim) {
+                      sim_data* sim, int n_running, int* sort_index) {
 
     /* Note which end conditions are set as active.
        Only these ones are checked */
-    int active_tlim      = sim->endcond_active & endcond_tlim;
-    int active_wall      = sim->endcond_active & endcond_wall;
-    int active_emin      = sim->endcond_active & endcond_emin;
-    int active_therm     = sim->endcond_active & endcond_therm;
-    int active_rhomax    = sim->endcond_active & endcond_rhomax;
-    int active_rhomin    = sim->endcond_active & endcond_rhomin;
-    int active_polmax    = sim->endcond_active & endcond_polmax;
-    int active_tormax    = sim->endcond_active & endcond_tormax;
-    int active_cpumax    = sim->endcond_active & endcond_cpumax;
-    int active_neutr     = sim->endcond_active & endcond_neutr;
-    int active_ioniz     = sim->endcond_active & endcond_ioniz;
+  int active_tlim      = sim->endcond_active & endcond_tlim;
+  int active_wall      = sim->endcond_active & endcond_wall;
+  int active_emin      = sim->endcond_active & endcond_emin;
+  int active_therm     = sim->endcond_active & endcond_therm;
+  int active_rhomax    = sim->endcond_active & endcond_rhomax;
+  int active_rhomin    = sim->endcond_active & endcond_rhomin;
+  int active_polmax    = sim->endcond_active & endcond_polmax;
+  int active_tormax    = sim->endcond_active & endcond_tormax;
+  int active_cpumax    = sim->endcond_active & endcond_cpumax;
+  int active_neutr     = sim->endcond_active & endcond_neutr;
+  int active_ioniz     = sim->endcond_active & endcond_ioniz;
 
-    #pragma omp simd
-    GPU_PARALLEL_LOOP_ALL_LEVELS
-    for(int i = 0; i < NSIMD; i++) {
-        if(p_f->running[i]) {
+#pragma omp simd
+  GPU_PARALLEL_LOOP_ALL_LEVELS
+    for(int iloc = 0; iloc < n_running; iloc++) {
+      int i = sort_index[iloc];
+      /* Update bounces if pitch changed sign */
+      if( (p_i->p_r[i]*p_i->B_r[i] + p_i->p_phi[i]*p_i->B_phi[i]
+	   + p_i->p_z[i]*p_i->B_z[i])
+	  * (p_f->p_r[i]*p_f->B_r[i] + p_f->p_phi[i]*p_f->B_phi[i]
+	     + p_f->p_z[i]*p_f->B_z[i]) < 0 ) {
+	if(p_f->bounces[i] > 0) {
+	  /* Half bounce */
+	  p_f->bounces[i] *= -1;
+	}
+	else if(p_f->bounces[i] < 0) {
+	  /* Bounce complete */
+	  p_f->bounces[i] *= -1;
+	  p_f->bounces[i] +=  1;
+	}
+	else {
+	  /* Initial bounce */
+	  p_f->bounces[i] +=  1;
+	}
+      }
 
-            /* Update bounces if pitch changed sign */
-            if( (p_i->p_r[i]*p_i->B_r[i] + p_i->p_phi[i]*p_i->B_phi[i]
-                 + p_i->p_z[i]*p_i->B_z[i])
-                * (p_f->p_r[i]*p_f->B_r[i] + p_f->p_phi[i]*p_f->B_phi[i]
-                   + p_f->p_z[i]*p_f->B_z[i]) < 0 ) {
-                if(p_f->bounces[i] > 0) {
-                    /* Half bounce */
-                    p_f->bounces[i] *= -1;
-                }
-                else if(p_f->bounces[i] < 0) {
-                    /* Bounce complete */
-                    p_f->bounces[i] *= -1;
-                    p_f->bounces[i] +=  1;
-                }
-                else {
-                    /* Initial bounce */
-                    p_f->bounces[i] +=  1;
-                }
-            }
+      /* Check if the marker time exceeds simulation time */
+      if(active_tlim) {
+	if(!sim->reverse_time && p_f->time[i] > sim->endcond_lim_simtime) {
+	  p_f->endcond[i] |= endcond_tlim;
+	  p_f->running[i] = 0;
+	}
+	if(sim->reverse_time && p_f->time[i] < sim->endcond_lim_simtime) {
+	  p_f->endcond[i] |= endcond_tlim;
+	  p_f->running[i] = 0;
+	}
+	if(p_f->mileage[i] > sim->endcond_max_mileage) {
+	  p_f->endcond[i] |= endcond_tlim;
+	  p_f->running[i] = 0;
+	}
+      }
 
-            /* Check if the marker time exceeds simulation time */
-            if(active_tlim) {
-                if(!sim->reverse_time && p_f->time[i] > sim->endcond_lim_simtime) {
-                    p_f->endcond[i] |= endcond_tlim;
-                    p_f->running[i] = 0;
-                }
-                if(sim->reverse_time && p_f->time[i] < sim->endcond_lim_simtime) {
-                    p_f->endcond[i] |= endcond_tlim;
-                    p_f->running[i] = 0;
-                }
-                if(p_f->mileage[i] > sim->endcond_max_mileage) {
-                    p_f->endcond[i] |= endcond_tlim;
-                    p_f->running[i] = 0;
-                }
-            }
+      /* Check, using the wall collision module, whether marker hit wall
+       * during this time-step. Store the wall element ID if it did. */
+      if(active_wall) {
+	real w_coll = 0;
+	int tile = wall_hit_wall(
+				 p_i->r[i], p_i->phi[i], p_i->z[i],
+				 p_f->r[i], p_f->phi[i], p_f->z[i], &sim->wall_data, &w_coll);
+	if(tile > 0) {
+	  real w = w_coll;
+	  p_f->time[i] = p_i->time[i] + w*(p_f->time[i] - p_i->time[i]);
+	  p_f->r[i]    = p_i->r[i] + w*(p_f->r[i] - p_i->r[i]);
+	  p_f->phi[i]  = p_i->phi[i] + w*(p_f->phi[i] - p_i->phi[i]);
+	  p_f->z[i]    = p_i->z[i] + w*(p_f->z[i] - p_i->z[i]);
 
-            /* Check, using the wall collision module, whether marker hit wall
-             * during this time-step. Store the wall element ID if it did. */
-            if(active_wall) {
-                real w_coll = 0;
-                int tile = wall_hit_wall(
-                    p_i->r[i], p_i->phi[i], p_i->z[i],
-                    p_f->r[i], p_f->phi[i], p_f->z[i], &sim->wall_data, &w_coll);
-                if(tile > 0) {
-                    real w = w_coll;
-                    p_f->time[i] = p_i->time[i] + w*(p_f->time[i] - p_i->time[i]);
-                    p_f->r[i]    = p_i->r[i] + w*(p_f->r[i] - p_i->r[i]);
-                    p_f->phi[i]  = p_i->phi[i] + w*(p_f->phi[i] - p_i->phi[i]);
-                    p_f->z[i]    = p_i->z[i] + w*(p_f->z[i] - p_i->z[i]);
+	  p_f->walltile[i] = tile;
+	  p_f->endcond[i] |= endcond_wall;
+	  p_f->running[i] = 0;
+	}
+      }
 
-                    p_f->walltile[i] = tile;
-                    p_f->endcond[i] |= endcond_wall;
-                    p_f->running[i] = 0;
-                }
-            }
+      /* Evaluate marker energy, and check if it is below the minimum
+       * energy limit or local thermal energy limit */
+      if(active_emin || active_therm) {
+	real pnorm = math_normc(
+				p_f->p_r[i], p_f->p_phi[i], p_f->p_z[i]);
+	real ekin = physlib_Ekin_pnorm(p_f->mass[i], pnorm);
 
-            /* Evaluate marker energy, and check if it is below the minimum
-             * energy limit or local thermal energy limit */
-            if(active_emin || active_therm) {
-                real pnorm = math_normc(
-                    p_f->p_r[i], p_f->p_phi[i], p_f->p_z[i]);
-                real ekin = physlib_Ekin_pnorm(p_f->mass[i], pnorm);
+	real Ti;
+	a5err errflag =
+	  plasma_eval_temp(&Ti, p_f->rho[i], p_f->r[i], p_f->phi[i],
+			   p_f->z[i], p_f->time[i], 1,
+			   &sim->plasma_data);
 
-                real Ti;
-                a5err errflag =
-                    plasma_eval_temp(&Ti, p_f->rho[i], p_f->r[i], p_f->phi[i],
-                                     p_f->z[i], p_f->time[i], 1,
-                                     &sim->plasma_data);
+	/* Error handling */
+	if(errflag) {
+	  p_f->err[i]     = errflag;
+	  p_f->running[i] = 0;
+	  Ti = 0;
+	}
 
-                /* Error handling */
-                if(errflag) {
-                    p_f->err[i]     = errflag;
-                    p_f->running[i] = 0;
-                    Ti = 0;
-                }
+	if( active_emin && (ekin < sim->endcond_min_ekin) ) {
+	  p_f->endcond[i] |= endcond_emin;
+	  p_f->running[i] = 0;
+	}
+	if( active_therm && (ekin < (sim->endcond_min_thermal * Ti)) ) {
+	  p_f->endcond[i] |= endcond_therm;
+	  p_f->running[i] = 0;
+	}
+      }
 
-                if( active_emin && (ekin < sim->endcond_min_ekin) ) {
-                    p_f->endcond[i] |= endcond_emin;
-                    p_f->running[i] = 0;
-                }
-                if( active_therm && (ekin < (sim->endcond_min_thermal * Ti)) ) {
-                    p_f->endcond[i] |= endcond_therm;
-                    p_f->running[i] = 0;
-                }
-            }
+      /* Check if marker is not within the rho limits */
+      if(active_rhomax) {
+	if(p_f->rho[i] > sim->endcond_max_rho) {
+	  p_f->endcond[i] |= endcond_rhomax;
+	  p_f->running[i] = 0;
+	}
+      }
+      if(active_rhomin) {
+	if(p_f->rho[i] < sim->endcond_min_rho) {
+	  p_f->endcond[i] |= endcond_rhomin;
+	  p_f->running[i] = 0;
+	}
+      }
 
-            /* Check if marker is not within the rho limits */
-            if(active_rhomax) {
-                if(p_f->rho[i] > sim->endcond_max_rho) {
-                    p_f->endcond[i] |= endcond_rhomax;
-                    p_f->running[i] = 0;
-                }
-            }
-            if(active_rhomin) {
-                if(p_f->rho[i] < sim->endcond_min_rho) {
-                    p_f->endcond[i] |= endcond_rhomin;
-                    p_f->running[i] = 0;
-                }
-            }
+      /* Check if marker exceeds toroidal or poloidal limits */
+      int maxorb = 0;
+      if(active_tormax) {
+	if(fabs(p_f->phi[i]) > sim->endcond_max_tororb) {
+	  maxorb |= endcond_tormax;
+	}
+      }
+      if(active_polmax) {
+	if(fabs(p_f->theta[i]) > sim->endcond_max_polorb) {
+	  maxorb |= endcond_polmax;
+	}
+	else if( p_f->bounces[i] - 1 >=
+		 (int)(sim->endcond_max_polorb / CONST_2PI )) {
+	  maxorb |= endcond_polmax;
+	}
+      }
+      if( sim->endcond_torandpol &&
+	  maxorb & endcond_tormax && maxorb & endcond_polmax ) {
+	p_f->endcond[i] |= maxorb;
+	p_f->running[i] = 0;
+      }
+      else if(maxorb) {
+	p_f->endcond[i] |= maxorb;
+	p_f->running[i] = 0;
+      }
 
-            /* Check if marker exceeds toroidal or poloidal limits */
-            int maxorb = 0;
-            if(active_tormax) {
-                if(fabs(p_f->phi[i]) > sim->endcond_max_tororb) {
-                    maxorb |= endcond_tormax;
-                }
-            }
-            if(active_polmax) {
-                if(fabs(p_f->theta[i]) > sim->endcond_max_polorb) {
-                    maxorb |= endcond_polmax;
-                }
-                else if( p_f->bounces[i] - 1 >=
-                         (int)(sim->endcond_max_polorb / CONST_2PI )) {
-                    maxorb |= endcond_polmax;
-                }
-            }
-            if( sim->endcond_torandpol &&
-                maxorb & endcond_tormax && maxorb & endcond_polmax ) {
-                p_f->endcond[i] |= maxorb;
-                p_f->running[i] = 0;
-            }
-            else if(maxorb) {
-                p_f->endcond[i] |= maxorb;
-                p_f->running[i] = 0;
-            }
+      /* Check if the time spent simulating this marker exceeds the
+       * given limit*/
+      if(active_cpumax) {
+	if(p_f->cputime[i] > sim->endcond_max_cputime) {
+	  p_f->endcond[i] |= endcond_cpumax;
+	  p_f->running[i] = 0;
+	}
+      }
 
-            /* Check if the time spent simulating this marker exceeds the
-             * given limit*/
-            if(active_cpumax) {
-                if(p_f->cputime[i] > sim->endcond_max_cputime) {
-                    p_f->endcond[i] |= endcond_cpumax;
-                    p_f->running[i] = 0;
-                }
-            }
+      /* Check if the particle has been neutralized */
+      if(active_neutr) {
+	if(p_i->charge[i] != 0.0 && p_f->charge[i] == 0.0) {
+	  p_f->endcond[i] |= endcond_neutr;
+	  p_f->running[i] = 0;
+	}
+      }
 
-            /* Check if the particle has been neutralized */
-            if(active_neutr) {
-                if(p_i->charge[i] != 0.0 && p_f->charge[i] == 0.0) {
-                    p_f->endcond[i] |= endcond_neutr;
-                    p_f->running[i] = 0;
-                }
-            }
+      /* Check if the particle has been ionized */
+      if(active_ioniz) {
+	if(p_i->charge[i] == 0.0 && p_f->charge[i] != 0.0) {
+	  p_f->endcond[i] |= endcond_ioniz;
+	  p_f->running[i] = 0;
+	}
+      }
 
-            /* Check if the particle has been ionized */
-            if(active_ioniz) {
-                if(p_i->charge[i] == 0.0 && p_f->charge[i] != 0.0) {
-                    p_f->endcond[i] |= endcond_ioniz;
-                    p_f->running[i] = 0;
-                }
-            }
-
-            /* Zero end condition if error happened in this function */
-            if(p_f->err[i]) {
-                p_f->endcond[i] = 0;
-            }
-        }
+      /* Zero end condition if error happened in this function */
+      if(p_f->err[i]) {
+	p_f->endcond[i] = 0;
+      }
     }
 }
 

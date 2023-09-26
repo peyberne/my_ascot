@@ -30,6 +30,12 @@
 real simulate_fo_fixed_inidt(sim_data* sim, particle_simd_fo* p, int i);
 #pragma omp end declare target
 
+DECLARE_TARGET
+#ifdef SIMD
+#pragma omp declare simd uniform(sim)
+#endif
+void sort_by_key_int_wrapper(int *data, int *value, int N);
+
 /**
  * @brief Simulates particles using fixed time-step
  *
@@ -91,7 +97,10 @@ void simulate_fo_fixed(particle_queue* pq, sim_data* sim) {
     B_field_data* Bdata = &sim->B_data;
     E_field_data* Edata = &sim->E_data;
     particle_loc  p_loc;
-    
+    int sort_index[NSIMD];
+    int ps[NSIMD];
+    for (int i=0;i<NSIMD;i++)
+      sort_index[i] = i;    
 #pragma acc enter data copyin(	\
 		      p_loc.r_arr1[0:NSIMD],p_loc.r_arr2[0:NSIMD],p_loc.r_arr3[0:NSIMD],p_loc.r_arr4[0:NSIMD],p_loc.r_arr5[0:NSIMD],p_loc.i_arr1[0:NSIMD],p_loc.i_arr2[0:NSIMD],p_loc.i_arr3[0:NSIMD],p_loc.i_arr4[0:NSIMD],p_loc.i_arr5[0:NSIMD],p_loc.i_arr6[0:NSIMD],p_loc.i_arr7[0:NSIMD],p_loc.i_arr8[0:NSIMD],p_loc.i_arr9[0:NSIMD], \
        		      sim[0:1],		\
@@ -114,7 +123,7 @@ void simulate_fo_fixed(particle_queue* pq, sim_data* sim) {
 		      p0_ptr->B_phi[0:NSIMD],p0_ptr->B_phi_dr[0:NSIMD],p0_ptr->B_phi_dphi[0:NSIMD],p0_ptr->B_phi_dz[0:NSIMD],p0_ptr->B_z[0:NSIMD],p0_ptr->B_z_dr[0:NSIMD],p0_ptr->B_z_dphi[0:NSIMD], \
 		      p0_ptr->B_z_dz[0:NSIMD],p0_ptr->rho[0:NSIMD],p0_ptr->theta[0:NSIMD],p0_ptr->err[0:NSIMD],p0_ptr->time[0:NSIMD],p0_ptr->weight[0:NSIMD],p0_ptr->cputime[0:NSIMD],	\
 		      p0_ptr->id[0:NSIMD],p0_ptr->endcond[0:NSIMD],p0_ptr->walltile[0:NSIMD],p0_ptr->index[0:NSIMD],p0_ptr->znum[0:NSIMD],p0_ptr->anum[0:NSIMD],p0_ptr->bounces[0:NSIMD], \
-		      hin[0:NSIMD],\
+		      hin[0:NSIMD],sort_index[0:NSIMD],ps[0:NSIMD],\
 		      Bdata[0:1],Bdata->BTC.dB[0:1],Bdata->BSTS.axis_r,Bdata->BSTS.axis_r.c[0:1],Bdata->BSTS.axis_z,Bdata->BSTS.axis_z.c[0:1],Bdata->BSTS.B_r,Bdata->BSTS.B_r.c[0:1], \
 		      Bdata->BSTS.B_z,Bdata->BSTS.B_z.c[0:1],Bdata->BSTS.B_phi,Bdata->BSTS.B_phi.c[0:1],Bdata->B3DS.psi,Bdata->B3DS.psi.c[0:1],Bdata->B3DS.B_r,Bdata->B3DS.B_r.c[0:1], \
 		      Bdata->B3DS.B_phi,Bdata->B3DS.B_phi.c[0:1],Bdata->B3DS.B_z,Bdata->B3DS.B_z.c[0:1],Bdata->B2DS.psi,Bdata->B2DS.psi.c[0:1],Bdata->B2DS.B_r,Bdata->B2DS.B_r.c[0:1], \
@@ -130,9 +139,10 @@ void simulate_fo_fixed(particle_queue* pq, sim_data* sim) {
         #pragma omp simd
 
         GPU_PARALLEL_LOOP_ALL_LEVELS
-        for(int i = 0; i < NSIMD; i++) {
+	for(int iloc = 0; iloc < n_running; iloc++) {
+	  int i = sort_index[iloc];
 	  particle_copy_fo(p_ptr, i, p0_ptr, i);
-        }
+	}
         /*************************** Physics **********************************/
 
         /* Set time-step negative if tracing backwards in time */
@@ -155,7 +165,7 @@ void simulate_fo_fixed(particle_queue* pq, sim_data* sim) {
 #endif
             }
             else {
-	      step_fo_vpa(p_ptr, hin, &sim->B_data, &sim->E_data);
+	      step_fo_vpa(p_ptr, hin, &sim->B_data, &sim->E_data, n_running, sort_index);
             }
         }
 
@@ -204,12 +214,12 @@ void simulate_fo_fixed(particle_queue* pq, sim_data* sim) {
         cputime_last = cputime;
 
         /* Check possible end conditions */
-        endcond_check_fo(p_ptr, p0_ptr, sim);
+        endcond_check_fo(p_ptr, p0_ptr, sim, n_running, sort_index);
 
         /* Update diagnostics */
         if(!(sim->record_mode)) {
             /* Record particle coordinates */
-	  diag_update_fo(&sim->diag_data, &sim->B_data, p_ptr, p0_ptr, &p_loc);
+	  diag_update_fo(&sim->diag_data, &sim->B_data, p_ptr, p0_ptr, &p_loc, n_running, sort_index);
         }
         else {
 #ifdef GPU
@@ -243,6 +253,16 @@ void simulate_fo_fixed(particle_queue* pq, sim_data* sim) {
         /* Update running particles */
 #ifdef GPU
 	n_running = 0;
+	GPU_PARALLEL_LOOP_ALL_LEVELS
+	for (int i=0;i<NSIMD;i++) {
+	  ps[i] = -1*p.running[i];
+	  sort_index[i] = i;
+	}
+
+#pragma acc host_data use_device(ps,sort_index)
+	{
+	  sort_by_key_int_wrapper(ps,sort_index,NSIMD);
+	}
 #pragma omp simd reduction(+:n_running)
 #pragma acc parallel loop reduction(+:n_running)
 	for(int i = 0; i < NSIMD; i++)
