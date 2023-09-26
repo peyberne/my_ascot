@@ -204,12 +204,11 @@ void simulate_fo_fixed(particle_queue* pq, sim_data* sim) {
         cputime = A5_WTIME;
         #pragma omp simd
         GPU_PARALLEL_LOOP_ALL_LEVELS
-        for(int i = 0; i < NSIMD; i++) {
-            if(p.running[i]){
-                p.time[i]    += ( 1.0 - 2.0 * ( sim->reverse_time > 0 ) ) * hin[i];
-                p.mileage[i] += hin[i];
-                p.cputime[i] += cputime - cputime_last;
-            }
+        for(int iloc = 0; iloc < NSIMD; iloc++) {
+	  int i = sort_index[iloc];
+	  p.time[i]    += ( 1.0 - 2.0 * ( sim->reverse_time > 0 ) ) * hin[i];
+	  p.mileage[i] += hin[i];
+	  p.cputime[i] += cputime - cputime_last;
         }
         cputime_last = cputime;
 
