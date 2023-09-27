@@ -89,8 +89,7 @@ void dist_COM_update_fo(dist_COM_data* dist, B_field_data* Bdata,
 #pragma acc data present(weight[0:NSIMD],i_mu[0:NSIMD],i_Ekin[0:NSIMD],i_Ptor[0:NSIMD],ok[0:NSIMD] )
     {
     GPU_PARALLEL_LOOP_ALL_LEVELS  
-    for(int iloc = 0; iloc < n_running; iloc++) {
-      	int i = sort_index[iloc];
+    for(int i = 0; i < n_running; i++) {
             B_field_eval_psi(&psi, p_f->r[i], p_f->phi[i], p_f->z[i],
                              p_f->time[i], Bdata);
 
@@ -126,8 +125,7 @@ void dist_COM_update_fo(dist_COM_data* dist, B_field_data* Bdata,
     }
 
     GPU_PARALLEL_LOOP_ALL_LEVELS
-    for(int iloc = 0; iloc < n_running; iloc++) {
-	int i = sort_index[iloc];
+    for(int i = 0; i < n_running; i++) {
         if(ok[i]) {
             unsigned long index = dist_COM_index(i_mu[i], i_Ekin[i], i_Ptor[i],
                                                 dist->n_mu,  dist->n_Ekin,

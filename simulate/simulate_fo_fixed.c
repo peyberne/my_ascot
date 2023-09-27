@@ -293,7 +293,6 @@ void simulate_fo_fixed(particle_queue* pq, sim_data* sim) {
 	  {
 	    if(p_ptr->running[i] > 0) n_running++;
 	  }
-	printf("n_running = %d\n",n_running);
 #else
 	n_running = particle_cycle_fo(pq, &p, &sim->B_data, cycle);
         /* Determine simulation time-step for new particles */
