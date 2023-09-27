@@ -68,7 +68,8 @@ void dist_COM_init(dist_COM_data* dist_data,
  * @brief Update the histogram from full-orbit markers
  */
 void dist_COM_update_fo(dist_COM_data* dist, B_field_data* Bdata,
-                        particle_simd_fo* p_f, particle_simd_fo* p_i) {
+                        particle_simd_fo* p_f, particle_simd_fo* p_i, particle_loc* p_loc, int n_running, int* sort_index) {
+
     real Ekin;
     real Ptor;
     real Bnorm;
@@ -78,17 +79,18 @@ void dist_COM_update_fo(dist_COM_data* dist, B_field_data* Bdata,
     real pnorm;
     real ppar;
 
-    int i_mu[NSIMD];
-    int i_Ekin[NSIMD];
-    int i_Ptor[NSIMD];
-
-    int ok[NSIMD];
-    real weight[NSIMD];
+    real* weight  = p_loc->r_arr1;
+    int*  i_mu    = p_loc->i_arr1;
+    int*  i_Ekin  = p_loc->i_arr2;
+    int*  i_Ptor  = p_loc->i_arr3;
+    int*  ok      = p_loc->i_arr4;
 
     #pragma omp simd
-    for(int i = 0; i < NSIMD; i++) {
-        if(p_f->running[i]) {
-
+#pragma acc data present(weight[0:NSIMD],i_mu[0:NSIMD],i_Ekin[0:NSIMD],i_Ptor[0:NSIMD],ok[0:NSIMD] )
+    {
+    GPU_PARALLEL_LOOP_ALL_LEVELS  
+    for(int iloc = 0; iloc < n_running; iloc++) {
+      	int i = sort_index[iloc];
             B_field_eval_psi(&psi, p_f->r[i], p_f->phi[i], p_f->z[i],
                              p_f->time[i], Bdata);
 
@@ -121,19 +123,22 @@ void dist_COM_update_fo(dist_COM_data* dist, B_field_data* Bdata,
             else {
                 ok[i] = 0;
             }
-        }
     }
 
-    for(int i = 0; i < NSIMD; i++) {
-        if(p_f->running[i] && ok[i]) {
+    GPU_PARALLEL_LOOP_ALL_LEVELS
+    for(int iloc = 0; iloc < n_running; iloc++) {
+	int i = sort_index[iloc];
+        if(ok[i]) {
             unsigned long index = dist_COM_index(i_mu[i], i_Ekin[i], i_Ptor[i],
                                                 dist->n_mu,  dist->n_Ekin,
                                                 dist->n_Ptor);
 
             #pragma omp atomic
+            #pragma acc atomic
             dist->histogram[index] += weight[i];
         }
     }
+}
 }
 
 /**
