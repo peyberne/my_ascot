@@ -157,17 +157,17 @@ void simulate_fo_fixed(particle_queue* pq, sim_data* sim) {
         #pragma omp simd
 
         GPU_PARALLEL_LOOP_ALL_LEVELS
-	for(int i = 0; i < NSIMD; i++) {
+	for(int i = 0; i < n_running; i++) {
 	  particle_copy_fo(p_ptr, i, p0_ptr, i);
 	}
         /*************************** Physics **********************************/
 
         /* Set time-step negative if tracing backwards in time */
-        #pragma omp simd
-        GPU_PARALLEL_LOOP_ALL_LEVELS
-        for(int i = 0; i < NSIMD; i++) {
-            if(sim->reverse_time) {
-                hin_ptr[i]  = -hin_ptr[i];
+	if(sim->reverse_time) {
+#pragma omp simd
+	  GPU_PARALLEL_LOOP_ALL_LEVELS
+	    for(int i = 0; i < n_running; i++) {
+	      hin_ptr[i]  = -hin_ptr[i];
             }
         }
 
@@ -187,11 +187,11 @@ void simulate_fo_fixed(particle_queue* pq, sim_data* sim) {
         }
 
         /* Switch sign of the time-step again if it was reverted earlier */
-        #pragma omp simd
-        GPU_PARALLEL_LOOP_ALL_LEVELS
-        for(int i = 0; i < NSIMD; i++) {
-            if(sim->reverse_time) {
-                hin_ptr[i]  = -hin_ptr[i];
+	if(sim->reverse_time) {
+#pragma omp simd
+	  GPU_PARALLEL_LOOP_ALL_LEVELS
+	    for(int i = 0; i < n_running; i++) {
+	      hin_ptr[i]  = -hin_ptr[i];
             }
         }
 
