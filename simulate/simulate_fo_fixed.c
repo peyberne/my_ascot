@@ -146,11 +146,12 @@ void simulate_fo_fixed(particle_queue* pq, sim_data* sim) {
         /*************************** Physics **********************************/
 
         /* Set time-step negative if tracing backwards in time */
-        #pragma omp simd
-        GPU_PARALLEL_LOOP_ALL_LEVELS
-        for(int i = 0; i < NSIMD; i++) {
-            if(sim->reverse_time) {
-                hin[i]  = -hin[i];
+	if(sim->reverse_time) {
+#pragma omp simd
+	  GPU_PARALLEL_LOOP_ALL_LEVELS
+	    for(int iloc = 0; iloc < n_running; iloc++) {
+	      int i = sort_index[iloc];
+	      hin[i]  = -hin[i];
             }
         }
 
@@ -170,11 +171,12 @@ void simulate_fo_fixed(particle_queue* pq, sim_data* sim) {
         }
 
         /* Switch sign of the time-step again if it was reverted earlier */
-        #pragma omp simd
-        GPU_PARALLEL_LOOP_ALL_LEVELS
-        for(int i = 0; i < NSIMD; i++) {
-            if(sim->reverse_time) {
-                hin[i]  = -hin[i];
+	if(sim->reverse_time) {
+#pragma omp simd
+	  GPU_PARALLEL_LOOP_ALL_LEVELS
+	    for(int iloc = 0; iloc < n_running; iloc++) {
+	      int i = sort_index[iloc];
+	      hin[i]  = -hin[i];
             }
         }
 
@@ -204,7 +206,7 @@ void simulate_fo_fixed(particle_queue* pq, sim_data* sim) {
         cputime = A5_WTIME;
         #pragma omp simd
         GPU_PARALLEL_LOOP_ALL_LEVELS
-        for(int iloc = 0; iloc < NSIMD; iloc++) {
+        for(int iloc = 0; iloc < n_running; iloc++) {
 	  int i = sort_index[iloc];
 	  p.time[i]    += ( 1.0 - 2.0 * ( sim->reverse_time > 0 ) ) * hin[i];
 	  p.mileage[i] += hin[i];
