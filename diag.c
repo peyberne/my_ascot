@@ -244,7 +244,7 @@ void diag_update_fo(diag_data* data, B_field_data* Bdata, particle_simd_fo* p_f,
     }
 
     if(data->distCOM_collect){
-      dist_COM_update_fo(&data->distCOM, Bdata, p_f, p_i, p_loc);
+      dist_COM_update_fo(&data->distCOM, Bdata, p_f, p_i, p_loc, n_running, sort_index);
     }
     
     if(data->diagtrcof_collect){
