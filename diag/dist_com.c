@@ -68,7 +68,8 @@ void dist_COM_init(dist_COM_data* dist_data,
  * @brief Update the histogram from full-orbit markers
  */
 void dist_COM_update_fo(dist_COM_data* dist, B_field_data* Bdata,
-                        particle_simd_fo* p_f, particle_simd_fo* p_i) {
+                        particle_simd_fo* p_f, particle_simd_fo* p_i, particle_loc* p_loc) {
+
     real Ekin;
     real Ptor;
     real Bnorm;
@@ -78,14 +79,16 @@ void dist_COM_update_fo(dist_COM_data* dist, B_field_data* Bdata,
     real pnorm;
     real ppar;
 
-    int i_mu[NSIMD];
-    int i_Ekin[NSIMD];
-    int i_Ptor[NSIMD];
-
-    int ok[NSIMD];
-    real weight[NSIMD];
+    real* weight  = p_loc->r_arr1;
+    int*  i_mu    = p_loc->i_arr1;
+    int*  i_Ekin  = p_loc->i_arr2;
+    int*  i_Ptor  = p_loc->i_arr3;
+    int*  ok      = p_loc->i_arr4;
 
     #pragma omp simd
+#pragma acc data present(weight[0:NSIMD],i_mu[0:NSIMD],i_Ekin[0:NSIMD],i_Ptor[0:NSIMD],ok[0:NSIMD] )
+    {
+    GPU_PARALLEL_LOOP_ALL_LEVELS  
     for(int i = 0; i < NSIMD; i++) {
         if(p_f->running[i]) {
 
@@ -124,6 +127,7 @@ void dist_COM_update_fo(dist_COM_data* dist, B_field_data* Bdata,
         }
     }
 
+    GPU_PARALLEL_LOOP_ALL_LEVELS
     for(int i = 0; i < NSIMD; i++) {
         if(p_f->running[i] && ok[i]) {
             unsigned long index = dist_COM_index(i_mu[i], i_Ekin[i], i_Ptor[i],
@@ -131,9 +135,11 @@ void dist_COM_update_fo(dist_COM_data* dist, B_field_data* Bdata,
                                                 dist->n_Ptor);
 
             #pragma omp atomic
+            #pragma acc atomic
             dist->histogram[index] += weight[i];
         }
     }
+}
 }
 
 /**
