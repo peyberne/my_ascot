@@ -216,7 +216,16 @@
  * @param nb plasma species densities [m^-3]
  * @param Tb plasma species temperatures [J]
  */
+#ifndef GPU
 #pragma omp declare simd uniform(nspec, mb, qb, nb, Tb)
+#else
+DECLARE_TARGET
+#endif
+static void mccc_coefs_clog(real* clogab, real ma, real qa, real va, int nspec,
+                            const real* mb, const real* qb, const real* nb,
+                            const real* Tb);
+DECLARE_TARGET_END
+
 static void mccc_coefs_clog(real* clogab, real ma, real qa, real va, int nspec,
                             const real* mb, const real* qb, const real* nb,
                             const real* Tb) {
@@ -262,7 +271,13 @@ static void mccc_coefs_clog(real* clogab, real ma, real qa, real va, int nspec,
  * @param x argument for the special functions
  * @param mdata pointer to mccc data
  */
+#ifndef GPU
 #pragma omp declare simd uniform(mdata)
+#else
+DECLARE_TARGET
+#endif
+static void mccc_coefs_mufun(real mufun[3], real x, mccc_data* mdata);
+DECLARE_TARGET_END
 static void mccc_coefs_mufun(real mufun[3], real x, mccc_data* mdata) {
 
     if(!mdata->usetabulated && x!= 0) {
