@@ -28,8 +28,11 @@ void mccc_fo_euler(particle_simd_fo* p, real* h, plasma_data* pdata,
 
     /* Generate random numbers and get plasma information before going to the *
      * SIMD loop                                                              */
+#if defined(GPU) && !defined(RANDOM_LCG)
+  random_drand48_normal_cuda(rdata, 3*NSIMD, rnd);
+#else      
     random_normal_simd(rdata, 3*NSIMD, rnd);
-
+#endif
     int n_species  = plasma_get_n_species(pdata);
     const real* qb = plasma_get_species_charge(pdata);
     const real* mb = plasma_get_species_mass(pdata);

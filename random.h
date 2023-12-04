@@ -85,8 +85,18 @@ void random_lcg_normal_simd(random_data* rdata, int n, double* r);
 
 //#define _XOPEN_SOURCE 500
 #include <stdlib.h>
+#ifdef GPU
+#include <curand.h>
+#endif
 
-typedef void* random_data;
+typedef struct {
+    void* r;
+#ifdef GPU
+    double *r_cuda;
+    curandGenerator_t gen;
+    cudaError_t cudaStatus;
+#endif  
+} random_data;
 
 double random_drand48_normal();
 void random_drand48_uniform_simd(int n, double* r);
@@ -97,6 +107,13 @@ void random_drand48_normal_simd(int n, double* r);
 #define random_normal(data) random_drand_normal()
 #define random_uniform_simd(data, n, r) random_drand48_uniform_simd(n, r)
 #define random_normal_simd(data, n, r) random_drand48_normal_simd(n, r)
+
+#ifdef GPU
+void random_drand48_normal_cuda_init(random_data* data, int n);
+void random_drand48_normal_cuda(random_data* data, int n, double* r);
+#define random_cuda_init(data, n) random_drand48_normal_cuda_init(data, n); 
+#define random_normal_cuda(data, n, r) random_drand48_normal_cuda(data, n, r);
+#endif
 
 #endif
 

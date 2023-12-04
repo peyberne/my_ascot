@@ -178,8 +178,70 @@ void random_drand48_uniform_simd(int n, double* r) {
         r[i] = drand48();
     }
 }
+#ifdef GPU
+void random_drand48_normal_cuda(random_data* data, int n, double* r)
+{
+    // Generate random numbers on the host
+    double x1, x2, w; /* Helper variables */
+    int isEven = (n+1) % 2; /* Indicates if even number of random numbers are requested */
+#pragma acc host_data use_device(data->r_cuda)
+    {
+      int status = curandGenerateUniformDouble(data->gen, data->r_cuda, n);
+    }
+#if A5_CCOL_USE_GEOBM == 1
+    /* The geometric form */
+#ifdef GPU
+    GPU_PARALLEL_LOOP_ALL_LEVELS
+#else
+    #pragma omp simd
+#endif
+    for(int i = 0; i < n; i=i+2) {
+        w = 2.0;
+        while( w >= 1.0 ) {
+            x1 = 2*data->r_cuda[i]  -1;
+            x2 = 2*data->r_cuda[i+1]-1;
+            w = x1*x1 + x2*x2;
+        }
 
+        w = sqrt( (-2 * log( w ) ) / w );
+        r[i] = x1 * w;
+        if((i < n-2) || (isEven > 0)) {
+            r[i+1] = x2 * w;
+        }
+    }
+#else
+    /* The common form */
+    double s;
+#ifdef GPU
+    GPU_PARALLEL_LOOP_ALL_LEVELS
+#else
+    #pragma omp simd
+#endif
+    for(int i = 0; i < n; i=i+2) {
+        x1 = data->r_cuda[i]  ;
+        x2 = data->r_cuda[i+1];
+        w = sqrt(-2*log(x1));
+        s = cos(CONST_2PI*x2);
+        r[i] = w*s;
+        if((i < n-2) || (isEven > 0) ) {
+            if(x2 < 0.5) {
+                r[i+1] = w*sqrt(1-s*s);
+            }
+            else {
+                r[i+1] = -w*sqrt(1-s*s);
+            }
+        }
+    }
+#endif
+}
 
+void random_drand48_normal_cuda_init(random_data* data, int  n) {
+  int status;
+  data->r_cuda = malloc(n * sizeof(double));
+  curandCreateGenerator(&data->gen, CURAND_RNG_PSEUDO_DEFAULT);
+  curandSetPseudoRandomGeneratorSeed(data->gen,  1234ULL);
+}
+#endif
 void random_drand48_normal_simd(int n, double* r) {
     double x1, x2, w; /* Helper variables */
     int isEven = (n+1) % 2; /* Indicates if even number of random numbers are requested */

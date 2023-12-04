@@ -172,9 +172,11 @@ void simulate(
 
     }
     pq.next = 0;
-
+#if defined(GPU) && !defined(RANDOM_LCG)
+    random_cuda_init(&sim.random_data, 3*NSIMD);
+#else    
     random_init(&sim.random_data, 0);
-
+#endif
     print_out(VERBOSE_NORMAL,"%s: All fields initialized. Simulation begins, %d threads.\n",
               targetname, omp_get_max_threads());
 
