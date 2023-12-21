@@ -170,7 +170,7 @@ void simulate_fo_fixed(particle_queue* pq, sim_data* sim) {
 			sim->random_data,
 #endif			
 			&sim->mccc_data,
-			rnd);
+			rnd, n_running, sort_index);
 #else
 	  printf("mccc_fo_euler ported on GPU only for RANDOM_LCG");
 	  exit(1);	  
