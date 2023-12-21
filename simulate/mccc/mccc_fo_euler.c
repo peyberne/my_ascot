@@ -24,7 +24,7 @@
  * @param mdata pointer collision data struct
  */
 void mccc_fo_euler(particle_simd_fo* p, real* h, plasma_data* pdata,
-                   random_data* rdata, mccc_data* mdata, real* rnd) {
+                   random_data* rdata, mccc_data* mdata, real* rnd, int n_running, int* sort_index) {
 
     /* Generate random numbers and get plasma information before going to the *
      * SIMD loop                                                              */
@@ -37,8 +37,8 @@ void mccc_fo_euler(particle_simd_fo* p, real* h, plasma_data* pdata,
     //    #pragma omp simd
     //    GPU_MAP_TO_DEVICE(rnd[0:3*NSIMD])
     GPU_PARALLEL_LOOP_ALL_LEVELS
-    for(int i = 0; i < NSIMD; i++) {
-        if(p->running[i]) {
+      for(int iloc = 0; iloc < n_running; iloc++) {
+	    int i = sort_index[iloc];
             a5err errflag = 0;
 
             /* These are needed twice to transform velocity to cartesian and *
@@ -128,7 +128,6 @@ void mccc_fo_euler(particle_simd_fo* p, real* h, plasma_data* pdata,
                 p->err[i]     = errflag;
                 p->running[i] = 0;
             }
-        }
-    }
+	}
     //    GPU_MAP_DELETE_DEVICE(rnd[0:3*NSIMD])
 }
