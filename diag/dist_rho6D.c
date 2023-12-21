@@ -129,6 +129,7 @@ void dist_rho6D_update_fo(dist_rho6D_data* dist, particle_simd_fo* p_f,
   {
     GPU_PARALLEL_LOOP_ALL_LEVELS
       for(int i = 0; i < n_running; i++) {
+        if(p_f->running[i]) {
 	i_rho[i] = floor((p_f->rho[i] - dist->min_rho)
 			 / ((dist->max_rho - dist->min_rho)/dist->n_rho));
 
@@ -178,10 +179,10 @@ void dist_rho6D_update_fo(dist_rho6D_data* dist, particle_simd_fo* p_f,
 	  ok[i] = 0;
 	}
       }
-
+      }
     GPU_PARALLEL_LOOP_ALL_LEVELS
       for(int i = 0; i < n_running; i++) {
-        if(ok[i]) {
+        if(p_f->running[i] && ok[i]) {
 	  unsigned long index = dist_rho6D_index(
 						 i_rho[i], i_theta[i], i_phi[i],
 						 i_pr[i], i_pphi[i], i_pz[i],

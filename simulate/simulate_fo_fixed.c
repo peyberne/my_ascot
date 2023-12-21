@@ -114,10 +114,13 @@ void simulate_fo_fixed(particle_queue* pq, sim_data* sim) {
       ps[i] = -1*p_ptr->running[i];
     }
     real rnd[3*NSIMD];
-
+    
 #ifdef GPU
     simulate_fo_fixed_copy_to_gpu(sim, p_ptr, p0_ptr, Bdata, Edata, &p_loc, hin, rnd, ps, sort_index, pbis_ptr, p0bis_ptr,  hinbis);
-#endif    
+    int n_running_ref = n_running;
+    int packing = 0;
+#endif
+    
     while(n_running > 0) {
         /* Store marker states */
         //#pragma omp simd
@@ -130,11 +133,13 @@ void simulate_fo_fixed(particle_queue* pq, sim_data* sim) {
         /* Set time-step negative if tracing backwards in time */
 	  //#pragma omp simd
 	  GPU_PARALLEL_LOOP_ALL_LEVELS
-	    for(int i = 0; i < n_running; i++) {
+	  for(int i = 0; i < n_running; i++) {
+	    if(p.running[i]) {
 	      if(sim->reverse_time) {
 		hin_ptr[i]  = -hin_ptr[i];
-            }
-        }
+	      }
+	    }
+	  }
 
         /* Volume preserving algorithm for orbit-following */
         if(sim->enable_orbfol) {
@@ -154,11 +159,13 @@ void simulate_fo_fixed(particle_queue* pq, sim_data* sim) {
         /* Switch sign of the time-step again if it was reverted earlier */
 	//#pragma omp simd
 	  GPU_PARALLEL_LOOP_ALL_LEVELS
-	    for(int i = 0; i < n_running; i++) {
+	  for(int i = 0; i < n_running; i++) {
+	    if(p.running[i]) {
 	      if(sim->reverse_time) {
 		hin_ptr[i]  = -hin_ptr[i];
-            }
-        }
+	      }
+	    }
+	  }
 
         /* Euler-Maruyama for Coulomb collisions */
         if(sim->enable_clmbcol) {
@@ -194,9 +201,11 @@ void simulate_fo_fixed(particle_queue* pq, sim_data* sim) {
         //#pragma omp simd
         GPU_PARALLEL_LOOP_ALL_LEVELS
         for(int i = 0; i < n_running; i++) {
-	  p_ptr->time[i]    += ( 1.0 - 2.0 * ( sim->reverse_time > 0 ) ) * hin_ptr[i];
-	  p_ptr->mileage[i] += hin_ptr[i];
-	  p_ptr->cputime[i] += cputime - cputime_last;
+	  if(p.running[i]) {
+	    p_ptr->time[i]    += ( 1.0 - 2.0 * ( sim->reverse_time > 0 ) ) * hin_ptr[i];
+	    p_ptr->mileage[i] += hin_ptr[i];
+	    p_ptr->cputime[i] += cputime - cputime_last;
+	  }
         }
         cputime_last = cputime;
 
@@ -239,34 +248,41 @@ void simulate_fo_fixed(particle_queue* pq, sim_data* sim) {
 
         /* Update, sort and pack running particles */
 #ifdef GPU
-	GPU_PARALLEL_LOOP_ALL_LEVELS
-	for (int i=0;i<NSIMD;i++) {
-	  ps[i] = -1*p_ptr->running[i];
-	  sort_index[i] = i;
+	if ((n_running_ref - n_running) < 0.001) {
+	  packing = 1;
+	  n_running_ref = n_running;
 	}
 
+	if (packing == 1) {
+	  GPU_PARALLEL_LOOP_ALL_LEVELS
+	  for (int i=0;i<NSIMD;i++) {
+	    ps[i] = -1*p_ptr->running[i];
+	    sort_index[i] = i;
+	  }
+	  
 #pragma acc host_data use_device(ps,sort_index)
-	{
-	  sort_by_key_int_wrapper(ps,sort_index,n_running);
+	  {
+	    sort_by_key_int_wrapper(ps,sort_index,n_running);
+	  }
+	  
+	  GPU_PARALLEL_LOOP_ALL_LEVELS
+	  for(int iloc = 0; iloc < NSIMD; iloc++)
+	    {
+	      int i = sort_index[iloc];
+	      particle_copy_fo(p_ptr, i, pbis_ptr, iloc);
+	      particle_copy_fo(p0_ptr, i, p0bis_ptr, iloc);
+	      hinbis[iloc] = hin[i];
+	    }
+	  n_running = 0;
+	  //#pragma omp simd reduction(+:n_running)
+	  GPU_PARALLEL_LOOP_ALL_LEVELS_REDUCTION(n_running)
+	  for(int i = 0; i < NSIMD; i++)
+	    {
+	      if(p_ptr->running[i] > 0) n_running++;
+	    }
 	}
-
-	GPU_PARALLEL_LOOP_ALL_LEVELS
-	for(int iloc = 0; iloc < NSIMD; iloc++)
-	  {
-	    int i = sort_index[iloc];
-	    particle_copy_fo(p_ptr, i, pbis_ptr, iloc);
-	    particle_copy_fo(p0_ptr, i, p0bis_ptr, iloc);
-	    hinbis[iloc] = hin[i];
-	  }
-	n_running = 0;
-	//#pragma omp simd reduction(+:n_running)
-	GPU_PARALLEL_LOOP_ALL_LEVELS_REDUCTION(n_running)
-	for(int i = 0; i < NSIMD; i++)
-	  {
-	    if(p_ptr->running[i] > 0) n_running++;
-	  }
 #else
-	n_running = particle_cycle_fo(pq, &p, &sim->B_data, cycle);
+	  n_running = particle_cycle_fo(pq, &p, &sim->B_data, cycle);
 #endif
 #ifndef GPU	
         /* Determine simulation time-step for new particles */
@@ -280,18 +296,23 @@ void simulate_fo_fixed(particle_queue* pq, sim_data* sim) {
         }
 #endif	
 	// Swap pointers to particle arrays
-	particle_simd_fo *p_tmp_ptr;
-	real* hin_tmp_ptr;
-	hin_tmp_ptr = hin_ptr;
-	hin_ptr = hinbis_ptr;
-	hinbis_ptr = hin_tmp_ptr;
-	p_tmp_ptr = p_ptr;
-	p_ptr = pbis_ptr;
-	pbis_ptr = p_tmp_ptr;
-	p_tmp_ptr=p0_ptr;
-	p0_ptr = p0bis_ptr;
-	p0bis_ptr = p_tmp_ptr;
-
+#ifdef GPU
+	if (packing == 1) {
+	  particle_simd_fo *p_tmp_ptr;
+	  real* hin_tmp_ptr;
+	  hin_tmp_ptr = hin_ptr;
+	  hin_ptr = hinbis_ptr;
+	  hinbis_ptr = hin_tmp_ptr;
+	  p_tmp_ptr = p_ptr;
+	  p_ptr = pbis_ptr;
+	  pbis_ptr = p_tmp_ptr;
+	  p_tmp_ptr=p0_ptr;
+	  p0_ptr = p0bis_ptr;
+	  p0bis_ptr = p_tmp_ptr;
+	  
+	  packing = 0;
+	}
+#endif
     }
     /* All markers simulated! */
 

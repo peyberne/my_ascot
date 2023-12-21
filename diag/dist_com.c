@@ -90,6 +90,7 @@ void dist_COM_update_fo(dist_COM_data* dist, B_field_data* Bdata,
     {
     GPU_PARALLEL_LOOP_ALL_LEVELS  
     for(int i = 0; i < n_running; i++) {
+      if(p_f->running[i]) {
             B_field_eval_psi(&psi, p_f->r[i], p_f->phi[i], p_f->z[i],
                              p_f->time[i], Bdata);
 
@@ -123,10 +124,10 @@ void dist_COM_update_fo(dist_COM_data* dist, B_field_data* Bdata,
                 ok[i] = 0;
             }
     }
-
+    }
     GPU_PARALLEL_LOOP_ALL_LEVELS
     for(int i = 0; i < n_running; i++) {
-        if(ok[i]) {
+        if(p_f->running[i] && ok[i]) {
             unsigned long index = dist_COM_index(i_mu[i], i_Ekin[i], i_Ptor[i],
                                                 dist->n_mu,  dist->n_Ekin,
                                                 dist->n_Ptor);

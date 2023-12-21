@@ -35,10 +35,10 @@ void mccc_fo_euler(particle_simd_fo* p, real* h, plasma_data* pdata,
     const real* mb = plasma_get_species_mass(pdata);
 
     //    #pragma omp simd
-    //    GPU_MAP_TO_DEVICE(rnd[0:3*NSIMD])
     GPU_PARALLEL_LOOP_ALL_LEVELS
       for(int i = 0; i < n_running; i++) {
-            a5err errflag = 0;
+        if(p->running[i]) {	 
+	    a5err errflag = 0;
 
             /* These are needed twice to transform velocity to cartesian and *
              * back to cylindrical coordinates. Position does not change     */
@@ -128,5 +128,5 @@ void mccc_fo_euler(particle_simd_fo* p, real* h, plasma_data* pdata,
                 p->running[i] = 0;
             }
 	}
-    //    GPU_MAP_DELETE_DEVICE(rnd[0:3*NSIMD])
+      }
 }
