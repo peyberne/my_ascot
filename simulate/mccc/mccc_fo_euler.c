@@ -37,8 +37,7 @@ void mccc_fo_euler(particle_simd_fo* p, real* h, plasma_data* pdata,
     //    #pragma omp simd
     //    GPU_MAP_TO_DEVICE(rnd[0:3*NSIMD])
     GPU_PARALLEL_LOOP_ALL_LEVELS
-      for(int iloc = 0; iloc < n_running; iloc++) {
-	    int i = sort_index[iloc];
+      for(int i = 0; i < n_running; i++) {
             a5err errflag = 0;
 
             /* These are needed twice to transform velocity to cartesian and *
