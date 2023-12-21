@@ -125,7 +125,7 @@ void simulate_fo_fixed(particle_queue* pq, sim_data* sim) {
         /* Store marker states */
         //#pragma omp simd
         GPU_PARALLEL_LOOP_ALL_LEVELS
-	for(int i = 0; i < n_running; i++) {
+	for(int i = 0; i < n_running_ref; i++) {
 	  particle_copy_fo(p_ptr, i, p0_ptr, i);
 	}
         /*************************** Physics **********************************/
@@ -133,7 +133,7 @@ void simulate_fo_fixed(particle_queue* pq, sim_data* sim) {
         /* Set time-step negative if tracing backwards in time */
 	  //#pragma omp simd
 	  GPU_PARALLEL_LOOP_ALL_LEVELS
-	  for(int i = 0; i < n_running; i++) {
+	  for(int i = 0; i < n_running_ref; i++) {
 	    if(p.running[i]) {
 	      if(sim->reverse_time) {
 		hin_ptr[i]  = -hin_ptr[i];
@@ -152,14 +152,14 @@ void simulate_fo_fixed(particle_queue* pq, sim_data* sim) {
                                 &sim->boozer_data, &sim->mhd_data);
             }
             else {
-	      step_fo_vpa(p_ptr, hin_ptr, &sim->B_data, &sim->E_data, n_running, sort_index);
+	      step_fo_vpa(p_ptr, hin_ptr, &sim->B_data, &sim->E_data, n_running_ref, sort_index);
             }
         }
 
         /* Switch sign of the time-step again if it was reverted earlier */
 	//#pragma omp simd
 	  GPU_PARALLEL_LOOP_ALL_LEVELS
-	  for(int i = 0; i < n_running; i++) {
+	  for(int i = 0; i < n_running_ref; i++) {
 	    if(p.running[i]) {
 	      if(sim->reverse_time) {
 		hin_ptr[i]  = -hin_ptr[i];
@@ -177,7 +177,7 @@ void simulate_fo_fixed(particle_queue* pq, sim_data* sim) {
 			sim->random_data,
 #endif			
 			&sim->mccc_data,
-			rnd, n_running, sort_index);
+			rnd, n_running_ref, sort_index);
 #else
 	  printf("mccc_fo_euler ported on GPU only for RANDOM_LCG");
 	  exit(1);	  
@@ -200,7 +200,7 @@ void simulate_fo_fixed(particle_queue* pq, sim_data* sim) {
         cputime = A5_WTIME;
         //#pragma omp simd
         GPU_PARALLEL_LOOP_ALL_LEVELS
-        for(int i = 0; i < n_running; i++) {
+        for(int i = 0; i < n_running_ref; i++) {
 	  if(p.running[i]) {
 	    p_ptr->time[i]    += ( 1.0 - 2.0 * ( sim->reverse_time > 0 ) ) * hin_ptr[i];
 	    p_ptr->mileage[i] += hin_ptr[i];
@@ -210,12 +210,12 @@ void simulate_fo_fixed(particle_queue* pq, sim_data* sim) {
         cputime_last = cputime;
 
         /* Check possible end conditions */
-        endcond_check_fo(p_ptr, p0_ptr, sim, n_running, sort_index);
+        endcond_check_fo(p_ptr, p0_ptr, sim, n_running_ref, sort_index);
 
         /* Update diagnostics */
         if(!(sim->record_mode)) {
             /* Record particle coordinates */
-	  diag_update_fo(&sim->diag_data, &sim->B_data, p_ptr, p0_ptr, &p_loc, n_running, sort_index);
+	  diag_update_fo(&sim->diag_data, &sim->B_data, p_ptr, p0_ptr, &p_loc, n_running_ref, sort_index);
         }
         else {
 #ifdef GPU
@@ -248,7 +248,7 @@ void simulate_fo_fixed(particle_queue* pq, sim_data* sim) {
 
         /* Update, sort and pack running particles */
 #ifdef GPU
-	if ((n_running_ref - n_running) < 0.001) {
+	if ((n_running_ref - n_running) > (0.001*n_running_ref)) {
 	  packing = 1;
 	  n_running_ref = n_running;
 	}
@@ -262,7 +262,7 @@ void simulate_fo_fixed(particle_queue* pq, sim_data* sim) {
 	  
 #pragma acc host_data use_device(ps,sort_index)
 	  {
-	    sort_by_key_int_wrapper(ps,sort_index,n_running);
+	    sort_by_key_int_wrapper(ps,sort_index,n_running_ref);
 	  }
 	  
 	  GPU_PARALLEL_LOOP_ALL_LEVELS
@@ -273,16 +273,16 @@ void simulate_fo_fixed(particle_queue* pq, sim_data* sim) {
 	      particle_copy_fo(p0_ptr, i, p0bis_ptr, iloc);
 	      hinbis[iloc] = hin[i];
 	    }
-	  n_running = 0;
-	  //#pragma omp simd reduction(+:n_running)
-	  GPU_PARALLEL_LOOP_ALL_LEVELS_REDUCTION(n_running)
-	  for(int i = 0; i < NSIMD; i++)
-	    {
-	      if(p_ptr->running[i] > 0) n_running++;
-	    }
 	}
+	n_running = 0;
+	//#pragma omp simd reduction(+:n_running)
+	GPU_PARALLEL_LOOP_ALL_LEVELS_REDUCTION(n_running)
+	for(int i = 0; i < NSIMD; i++)
+	  {
+	    if(p_ptr->running[i] > 0) n_running++;
+	  }
 #else
-	  n_running = particle_cycle_fo(pq, &p, &sim->B_data, cycle);
+	n_running = particle_cycle_fo(pq, &p, &sim->B_data, cycle);
 #endif
 #ifndef GPU	
         /* Determine simulation time-step for new particles */
