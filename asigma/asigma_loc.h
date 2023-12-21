@@ -46,7 +46,6 @@ int asigma_loc_init_offload(asigma_loc_offload_data* offload_data,
 void asigma_loc_free_offload(asigma_loc_offload_data* offload_data,
                              real** offload_array);
 
-#pragma omp declare target
 void asigma_loc_init(asigma_loc_data* asgm_loc_data,
                      asigma_loc_offload_data* offload_data,
                      real* offload_array);
@@ -67,6 +66,5 @@ a5err asigma_loc_eval_sigmav(real* sigmav,
                              real E,
                              real T_e, real T_0, real n_i,
                              int* enable_atomic);
-#pragma omp end declare target
 
 #endif

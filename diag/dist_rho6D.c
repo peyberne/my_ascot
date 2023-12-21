@@ -14,7 +14,6 @@
 /**
  * @brief Internal function calculating the index in the histogram array
  */
-#pragma omp declare target
 unsigned long dist_rho6D_index(int i_rho, int i_theta, int i_phi, int i_pr,
                                int i_pphi, int i_pz, int i_time, int i_q,
                                int n_theta, int n_phi, int n_pr, int n_pphi,
@@ -28,7 +27,6 @@ unsigned long dist_rho6D_index(int i_rho, int i_theta, int i_phi, int i_pr,
         + i_time * (n_q)
         + i_q;
 }
-#pragma omp end declare target
 
 /**
  * @brief Frees the offload data
@@ -105,6 +103,8 @@ void dist_rho6D_init(dist_rho6D_data* dist_data,
  * @param dist pointer to distribution parameter struct
  * @param p_i pointer to SIMD particle struct at the beginning of time step
  * @param p_f pointer to SIMD particle struct at the end of time step
+ * @param p_loc pre-allocated pointer to SIMD arrays used in diagnostics kernels
+ *        to avoid dynamical allocation
  */
 void dist_rho6D_update_fo(dist_rho6D_data* dist, particle_simd_fo* p_f,
                           particle_simd_fo* p_i, particle_loc* p_loc, int n_running, int* sort_index) {
@@ -124,7 +124,7 @@ void dist_rho6D_update_fo(dist_rho6D_data* dist, particle_simd_fo* p_f,
   int* ok = p_loc->i_arr9;
   real* weight = p_loc->r_arr3;
 
-#pragma omp simd
+    //#pragma omp simd
 #pragma acc data present(phi[0:NSIMD],theta[0:NSIMD],i_rho[0:NSIMD],i_theta[0:NSIMD],i_phi[0:NSIMD],i_pr[0:NSIMD],i_pphi[0:NSIMD],i_pz[0:NSIMD],i_time[0:NSIMD],i_q[0:NSIMD],ok[0:NSIMD],weight[0:NSIMD])
   {
     GPU_PARALLEL_LOOP_ALL_LEVELS
@@ -192,8 +192,7 @@ void dist_rho6D_update_fo(dist_rho6D_data* dist, particle_simd_fo* p_f,
 						 dist->n_pr, dist->n_pphi,
 						 dist->n_pz, dist->n_time,
 						 dist->n_q);
-#pragma omp atomic
-#pragma acc atomic
+	  GPU_ATOMIC
 	  dist->histogram[index] += weight[i];
         }
       }

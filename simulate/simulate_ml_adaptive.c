@@ -5,7 +5,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <omp.h>
-//#include <immintrin.h>
+#ifndef __NVCOMPILER
+#include <immintrin.h>
+#endif
 #include <math.h>
 #include "../ascot5.h"
 #include "../simulate.h"
@@ -20,10 +22,8 @@
 #include "../math.h"
 #include "../consts.h"
 
-#pragma omp declare target
 #pragma omp declare simd uniform(sim)
 real simulate_ml_adaptive_inidt(sim_data* sim, particle_simd_ml* p, int i);
-#pragma omp end declare target
 
 
 #define MAGNETIC_FIELD_LINE_INISTEP 1.0e-2 /**< Initial step size in meters   */

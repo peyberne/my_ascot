@@ -219,6 +219,8 @@ void diag_free(diag_data* data) {
  *        time-step
  * @param p_i pointer to SIMD struct storing marker states at the beginning of
  *        current time-step
+ * @param p_loc pre-allocated pointer to SIMD arrays used in diagnostics kernels
+ *        to avoid dynamical allocation
  */
 void diag_update_fo(diag_data* data, B_field_data* Bdata, particle_simd_fo* p_f,
                     particle_simd_fo* p_i, particle_loc* p_loc, int n_running, int* sort_index) {
@@ -248,6 +250,10 @@ void diag_update_fo(diag_data* data, B_field_data* Bdata, particle_simd_fo* p_f,
     }
     
     if(data->diagtrcof_collect){
+#ifdef GPU
+	  printf("diagtrcof NOT YET PORTED TO GPU");
+	  exit(1);
+#endif
       diag_transcoef_update_fo(&data->diagtrcof, p_f, p_i);
     }
 }

@@ -14,7 +14,6 @@
 /**
  * @brief Internal function calculating the index in the histogram array
  */
-#pragma omp declare target
 unsigned long dist_5D_index(int i_r, int i_phi, int i_z, int i_ppara,
                             int i_pperp, int i_time, int i_q, int n_phi,
                             int n_z, int n_ppara, int n_pperp, int n_time,
@@ -27,7 +26,6 @@ unsigned long dist_5D_index(int i_r, int i_phi, int i_z, int i_ppara,
         + i_time  * (n_q)
         + i_q;
 }
-#pragma omp end declare target
 
 /**
  * @brief Frees the offload data
@@ -102,6 +100,8 @@ void dist_5D_init(dist_5D_data* dist_data, dist_5D_offload_data* offload_data,
  * @param dist pointer to distribution parameter struct
  * @param p_f pointer to SIMD particle struct at the end of current time step
  * @param p_i pointer to SIMD particle struct at the start of current time step
+ * @param p_loc pre-allocated pointer to SIMD arrays used in diagnostics kernels
+ *        to avoid dynamical allocation
  */
 void dist_5D_update_fo(dist_5D_data* dist, particle_simd_fo* p_f,
                        particle_simd_fo* p_i, particle_loc* p_loc, int n_running, int* sort_index) {
@@ -121,7 +121,7 @@ void dist_5D_update_fo(dist_5D_data* dist, particle_simd_fo* p_f,
   int* ok = p_loc->i_arr8;
   real* weight = p_loc->r_arr4;
 
-#pragma omp simd
+    //#pragma omp simd
 #pragma acc data present(phi[0:NSIMD],ppara[0:NSIMD],pperp[0:NSIMD],i_r[0:NSIMD],i_phi[0:NSIMD],i_z[0:NSIMD],i_ppara[0:NSIMD],i_pperp[0:NSIMD],i_time[0:NSIMD],i_q[0:NSIMD],ok[0:NSIMD],weight[0:NSIMD])
   {
     GPU_PARALLEL_LOOP_ALL_LEVELS
@@ -178,7 +178,7 @@ void dist_5D_update_fo(dist_5D_data* dist, particle_simd_fo* p_f,
 	}
       }
 
-    GPU_PARALLEL_LOOP_ALL_LEVELS
+      GPU_PARALLEL_LOOP_ALL_LEVELS
       for(int iloc = 0; iloc < n_running; iloc++) {
 	int i = sort_index[iloc];
 	if(ok[i]) {
@@ -188,8 +188,7 @@ void dist_5D_update_fo(dist_5D_data* dist, particle_simd_fo* p_f,
 					      dist->n_phi, dist->n_z,
 					      dist->n_ppara, dist->n_pperp,
 					      dist->n_time, dist->n_q);
-#pragma omp atomic
-#pragma acc atomic
+	  GPU_ATOMIC
 	  dist->histogram[index] += weight[i];
 	}
       }

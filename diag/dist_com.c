@@ -14,14 +14,12 @@
 /**
  * @brief Internal function calculating the index in the histogram array
  */
-#pragma omp declare target
 unsigned long dist_COM_index(int i_mu, int i_Ekin, int i_Ptor,
                              int n_mu, int n_Ekin, int n_Ptor) {
     return i_mu    * (n_Ekin * n_Ptor)
         + i_Ekin   * (n_Ptor)
         + i_Ptor;
 }
-#pragma omp end declare target
 
 /**
  * @brief Frees the offload data
@@ -66,6 +64,8 @@ void dist_COM_init(dist_COM_data* dist_data,
 
 /**
  * @brief Update the histogram from full-orbit markers
+ * @param p_loc pre-allocated pointer to SIMD arrays used in diagnostics kernels
+ *        to avoid dynamical allocation
  */
 void dist_COM_update_fo(dist_COM_data* dist, B_field_data* Bdata,
                         particle_simd_fo* p_f, particle_simd_fo* p_i, particle_loc* p_loc, int n_running, int* sort_index) {
@@ -85,7 +85,7 @@ void dist_COM_update_fo(dist_COM_data* dist, B_field_data* Bdata,
     int*  i_Ptor  = p_loc->i_arr3;
     int*  ok      = p_loc->i_arr4;
 
-    #pragma omp simd
+//    #pragma omp simd
 #pragma acc data present(weight[0:NSIMD],i_mu[0:NSIMD],i_Ekin[0:NSIMD],i_Ptor[0:NSIMD],ok[0:NSIMD] )
     {
     GPU_PARALLEL_LOOP_ALL_LEVELS  
@@ -132,9 +132,7 @@ void dist_COM_update_fo(dist_COM_data* dist, B_field_data* Bdata,
             unsigned long index = dist_COM_index(i_mu[i], i_Ekin[i], i_Ptor[i],
                                                 dist->n_mu,  dist->n_Ekin,
                                                 dist->n_Ptor);
-
-            #pragma omp atomic
-            #pragma acc atomic
+	    GPU_ATOMIC
             dist->histogram[index] += weight[i];
         }
     }

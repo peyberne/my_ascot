@@ -11,7 +11,6 @@
 #include "../../physlib.h"
 #include "../../consts.h"
 
-#pragma omp declare target
 
 
 /**
@@ -103,6 +102,5 @@ static void step_gceom_mhd(real* ydot, real* y, real mass, real charge,
 
 }
 
-#pragma omp end declare target
 
 #endif

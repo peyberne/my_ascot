@@ -1,4 +1,4 @@
-CC=h5cc
+CC=mpicc 
 
 
 ifdef TRAP_FPE
@@ -10,8 +10,8 @@ ifdef NSIMD
 	DEFINES+=-DNSIMD=$(NSIMD)
 endif
 
-ifdef TARGET
-    DEFINES+=-DTARGET=$(TARGET)
+ifdef GPU
+        DEFINES+=-DGPU
 endif
 
 ifdef VERBOSE
@@ -26,7 +26,7 @@ endif
 
 ifeq ($(MPI),1)
 	DEFINES+=-DMPI
-	CC=h5pcc
+	#CC=h5pcc
 endif
 
 ifeq ($(RANDOM),MKL)
@@ -44,11 +44,32 @@ endif
 
 ifneq ($(CC),h5cc)
 	ifneq ($(CC),h5pcc)
-		CFLAGS+=-lhdf5 -lhdf5_hl
+		CFLAGS+=-L$(HDF5_ROOT)/lib -lhdf5 -lhdf5_hl -I$(HDF5_ROOT)/include
 	endif
 endif
 
-CFLAGS+=-O2 -lm -Wall -fopenmp -fPIC -std=c11 $(DEFINES) $(FLAGS)
+ifdef TARGET
+    DEFINES+=-DTARGET=$(TARGET)
+endif
+
+ifeq ($(OMP),1)
+# uncomment this to compile for CPU only without SIMD
+        #CFLAGS+=-fopenmp -foffload=disable
+# uncomment this to compile for CPU only with SIMD
+        #CFLAGS+=-fopenmp -DSIMD -foffload=disable
+# uncomment this to compile for GPU 
+       CFLAGS+=-fopenmp 
+ifeq ($(GPU), 1)
+	CFLAGS+=-foffload="nvptx-none=-latomic"
+        CFLAGS+=-foffload="-mgomp" 
+	CFLAGS+="-g"
+	CFLAGS+=-foffload="-lm"
+else
+	CFLAGS+=-fopenmp -DSIMD -foffload=disable -DNSIMD=8
+endif
+endif
+
+CFLAGS+= -lm -fPIC -std=c11 $(DEFINES) $(FLAGS) #-DFULLMCCC
 
 # Write CFLAGS and CC to a file to be included into output
 $(shell echo "#define CFLAGS " $(CFLAGS) > compiler_flags.h)
@@ -134,12 +155,14 @@ OBJS= math.o list.o octree.o error.c \
 	random.o print.c hdf5_interface.o suzuki.o nbi.o biosaw.o \
 	asigma.o mpi_interface.o boschhale.o
 
-BINS=test_math test_nbi test_bsearch \
-	test_wall_2d test_plasma test_random \
-	test_wall_3d test_B test_offload test_E \
-	test_interp1Dcomp test_linint3D test_N0 test_N0_1D \
-	test_spline ascot5_main bbnbi5 test_diag_orb test_asigma \
-	test_afsi
+#BINS=test_math test_nbi test_bsearch \
+#	test_wall_2d test_plasma test_random \
+#	test_wall_3d test_B test_offload test_E \
+#	test_interp1Dcomp test_linint3D test_N0 test_N0_1D \
+#	test_spline ascot5_main bbnbi5 test_diag_orb test_asigma \
+#	test_afsi
+
+BINS=ascot5_main
 
 ifdef NOGIT
 	DUMMY_GIT_INFO := $(shell touch gitver.h)
