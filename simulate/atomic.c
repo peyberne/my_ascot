@@ -25,7 +25,6 @@
 #include "../asigma.h"
 #include "atomic.h"
 
-#pragma omp declare target
 #pragma omp declare simd uniform(asgm_data)
 a5err atomic_rates(
     real* rate_eff_ion, real* rate_eff_rec, int z_1, int a_1, real m_1,
@@ -35,7 +34,6 @@ a5err atomic_rates(
 #pragma omp declare simd
 a5err atomic_react(
     int* q, real dt, real rate_eff_ion, real rate_eff_rec, int z_1, real rnd);
-#pragma omp end declare target
 
 /**
  * @brief Determine if atomic reactions occur during time-step and change charge

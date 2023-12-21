@@ -73,7 +73,6 @@ int asigma_init_offload(asigma_offload_data* offload_data,
 void asigma_free_offload(asigma_offload_data* offload_data,
                          real** offload_array);
 
-#pragma omp declare target
 int asigma_init(asigma_data* asigma_data, asigma_offload_data* offload_data,
                 real* offload_array);
 #pragma omp declare simd uniform(asigmadata)
@@ -85,6 +84,5 @@ a5err asigma_eval_sigmav(
     real* sigmav, int z_1, int a_1, real m_1, int z_2, int a_2, int reac_type,
     asigma_data* asigmadata, real E, real T_e, real T_0, real n_i,
     int* enable_atomic);
-#pragma omp end declare target
 
 #endif

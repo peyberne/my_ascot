@@ -5,7 +5,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <omp.h>
-//#include <immintrin.h>
+#ifndef __NVCOMPILER
+#include <immintrin.h>
+#endif
 #include <math.h>
 #include "../ascot5.h"
 #include "../endcond.h"
@@ -23,10 +25,8 @@
 #include "step/step_gc_rk4.h"
 #include "mccc/mccc.h"
 
-#pragma omp declare target
 #pragma omp declare simd uniform(sim)
 real simulate_gc_fixed_inidt(sim_data* sim, particle_simd_gc* p, int i);
-#pragma omp end declare target
 
 /**
  * @brief Simulates guiding centers using fixed time-step

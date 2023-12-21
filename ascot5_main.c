@@ -146,7 +146,6 @@ int main(int argc, char** argv) {
 
     /* Total number of markers to be simulated */
     int n_tot;
-
     /* Marker input struct */
     input_particle* p;
 
@@ -189,6 +188,13 @@ int main(int argc, char** argv) {
             B_offload_array) ) {
         goto CLEANUP_FAILURE;
     }
+
+#ifdef GPU
+    if (nprts != NSIMD) {
+      printf("With GPU=1, NSIMD has to be equal to the number of markers = %d\n",nprts);
+      exit(1);
+    }
+#endif
 
     /* Combine input offload arrays to one */
     offload_package offload_data;
@@ -472,13 +478,8 @@ int offload_and_simulate(
                "Initialized diagnostics, %.1f MB.\n", diag_offload_array_size);
 
     /* Divide markers among host and target */
-#ifdef TARGET
-    int n_mic = nprts;
-    int n_host = 0;
-#else
     int n_mic = 0;
     int n_host = nprts;
-#endif
 
     double mic_start = 0, mic_end=0, host_start=0, host_end=0;
 
@@ -495,27 +496,9 @@ int offload_and_simulate(
     #pragma omp parallel sections num_threads(3)
     {
         /* Run simulation on first target */
-#if TARGET >= 1
-        #pragma omp section
-        {
-            mic_start = omp_get_wtime();
-
-            #pragma omp target device(0) map( \
-                pin[0:n_mic], \
-                offload_array[0:offload_data.offload_array_length], \
-                int_offload_array[0:int_offload_array_length], \
-                diag_offload_array[0:sim.diag_offload_data.offload_array_length] \
-            )
-            simulate(1, n_mic, pin, sim, offload_data, offload_array,
-                     int_offload_array, *diag_offload_array);
-
-            mic_end = omp_get_wtime();
-        }
-#endif
 
         /* No target, marker simulation happens where the code execution began.
          * Offloading is only emulated. */
-#ifndef TARGET
         #pragma omp section
         {
             host_start = omp_get_wtime();
@@ -523,7 +506,6 @@ int offload_and_simulate(
                 offload_array, int_offload_array, *diag_offload_array);
             host_end = omp_get_wtime();
         }
-#endif
     }
 
     /* Code execution returns to host. */
