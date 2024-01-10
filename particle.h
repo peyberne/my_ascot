@@ -463,5 +463,12 @@ DECLARE_TARGET_END
 void particle_copy_gc(particle_simd_gc* p1, int i, particle_simd_gc* p2, int j);
 #pragma omp declare simd
 void particle_copy_ml(particle_simd_ml* p1, int i, particle_simd_ml* p2, int j);
+#ifndef GPU
+#pragma omp declare simd
+#else
+DECLARE_TARGET
+#endif
+void hin_copy_fo(real* p1, int i, real* p2, int j);
+DECLARE_TARGET_END
 
 #endif

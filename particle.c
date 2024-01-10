@@ -1455,6 +1455,7 @@ int particle_fo_to_gc(particle_simd_fo* p_fo, int j, particle_simd_gc* p_gc,
  * @param p2 SIMD structure for output
  * @param j  index for the output slot
  */
+
 void particle_copy_fo(particle_simd_fo* p1, int i, particle_simd_fo* p2, int j) {
         p2->r[j]          = p1->r[i];
         p2->phi[j]        = p1->phi[i];
@@ -1590,4 +1591,9 @@ void particle_copy_ml(particle_simd_ml* p1, int i, particle_simd_ml* p2, int j) 
     p2->B_z_dr[j]     = p1->B_z_dr[i];
     p2->B_z_dphi[j]   = p1->B_z_dphi[i];
     p2->B_z_dz[j]     = p1->B_z_dz[i];
+}
+
+
+void hin_copy_fo(real* hin1, int i, real* hin2, int j) {
+        hin2[j]          = hin1[i];
 }

@@ -119,27 +119,29 @@ void simulate_fo_fixed(particle_queue* pq, sim_data* sim) {
     simulate_fo_fixed_copy_to_gpu(sim, p_ptr, p0_ptr, Bdata, Edata, &p_loc, hin, rnd, ps, sort_index, pbis_ptr, p0bis_ptr,  hinbis);
     int n_running_ref = n_running;
     int packing = 0;
+    int ipack = 0;
 #endif
-    
     while(n_running > 0) {
         /* Store marker states */
         //#pragma omp simd
         GPU_PARALLEL_LOOP_ALL_LEVELS
 	for(int i = 0; i < n_running_ref; i++) {
-	  particle_copy_fo(p_ptr, i, p0_ptr, i);
+	  if(p_ptr->running[i]) {
+	    particle_copy_fo(p_ptr, i, p0_ptr, i);
+	  }
 	}
         /*************************** Physics **********************************/
 
         /* Set time-step negative if tracing backwards in time */
-	  //#pragma omp simd
-	  GPU_PARALLEL_LOOP_ALL_LEVELS
-	  for(int i = 0; i < n_running_ref; i++) {
-	    if(p.running[i]) {
-	      if(sim->reverse_time) {
-		hin_ptr[i]  = -hin_ptr[i];
-	      }
+	//#pragma omp simd
+	GPU_PARALLEL_LOOP_ALL_LEVELS
+	for(int i = 0; i < n_running_ref; i++) {
+	  if(p_ptr->running[i]) {
+	    if(sim->reverse_time) {
+	      hin_ptr[i]  = -hin_ptr[i];
 	    }
 	  }
+	}
 
         /* Volume preserving algorithm for orbit-following */
         if(sim->enable_orbfol) {
@@ -158,14 +160,14 @@ void simulate_fo_fixed(particle_queue* pq, sim_data* sim) {
 
         /* Switch sign of the time-step again if it was reverted earlier */
 	//#pragma omp simd
-	  GPU_PARALLEL_LOOP_ALL_LEVELS
-	  for(int i = 0; i < n_running_ref; i++) {
-	    if(p.running[i]) {
-	      if(sim->reverse_time) {
-		hin_ptr[i]  = -hin_ptr[i];
-	      }
+	GPU_PARALLEL_LOOP_ALL_LEVELS
+	for(int i = 0; i < n_running_ref; i++) {
+	  if(p_ptr->running[i]) {
+	    if(sim->reverse_time) {
+	      hin_ptr[i]  = -hin_ptr[i];
 	    }
 	  }
+	}
 
         /* Euler-Maruyama for Coulomb collisions */
         if(sim->enable_clmbcol) {
@@ -201,12 +203,12 @@ void simulate_fo_fixed(particle_queue* pq, sim_data* sim) {
         //#pragma omp simd
         GPU_PARALLEL_LOOP_ALL_LEVELS
         for(int i = 0; i < n_running_ref; i++) {
-	  if(p.running[i]) {
+	  if(p_ptr->running[i]) {
 	    p_ptr->time[i]    += ( 1.0 - 2.0 * ( sim->reverse_time > 0 ) ) * hin_ptr[i];
 	    p_ptr->mileage[i] += hin_ptr[i];
 	    p_ptr->cputime[i] += cputime - cputime_last;
 	  }
-        }
+	}
         cputime_last = cputime;
 
         /* Check possible end conditions */
@@ -248,12 +250,14 @@ void simulate_fo_fixed(particle_queue* pq, sim_data* sim) {
 
         /* Update, sort and pack running particles */
 #ifdef GPU
-	if ((n_running_ref - n_running) > (0.001*n_running_ref)) {
+	if ((n_running_ref - n_running) > 0.001*NSIMD  ) {
 	  packing = 1;
 	  n_running_ref = n_running;
 	}
 
 	if (packing == 1) {
+	  ipack++;
+	  printf("PACKING: n_running = %d => packing number %d\n",n_running,ipack);
 	  GPU_PARALLEL_LOOP_ALL_LEVELS
 	  for (int i=0;i<NSIMD;i++) {
 	    ps[i] = -1*p_ptr->running[i];
@@ -262,7 +266,7 @@ void simulate_fo_fixed(particle_queue* pq, sim_data* sim) {
 	  
 #pragma acc host_data use_device(ps,sort_index)
 	  {
-	    sort_by_key_int_wrapper(ps,sort_index,n_running_ref);
+	    sort_by_key_int_wrapper(ps,sort_index,NSIMD);
 	  }
 	  
 	  GPU_PARALLEL_LOOP_ALL_LEVELS
@@ -271,7 +275,9 @@ void simulate_fo_fixed(particle_queue* pq, sim_data* sim) {
 	      int i = sort_index[iloc];
 	      particle_copy_fo(p_ptr, i, pbis_ptr, iloc);
 	      particle_copy_fo(p0_ptr, i, p0bis_ptr, iloc);
-	      hinbis[iloc] = hin[i];
+	      //hinbis_ptr[iloc] = hin_ptr[i];
+	      //use this to circumvent nvhpc compiler bug 
+	      hin_copy_fo(hin_ptr, i, hinbis_ptr, iloc);
 	    }
 	}
 	n_running = 0;
@@ -315,9 +321,26 @@ void simulate_fo_fixed(particle_queue* pq, sim_data* sim) {
 #endif
     }
     /* All markers simulated! */
-
+    
 #ifdef GPU
     simulate_fo_fixed_copy_from_gpu(sim, p_ptr, pbis_ptr);
+    particle_simd_fo *p_tmp_ptr;
+    if (p_ptr == &p) {
+      p_tmp_ptr = &p;
+      printf("p is used\n");
+    }
+    else if(p_ptr == &pbis) {
+      p_tmp_ptr = &pbis;
+      printf("pbis is used\n");
+      for(int i = 0; i < NSIMD; i++)
+	{
+	  particle_copy_fo(&pbis, i, &p, i);
+	}
+    }
+    else {
+      printf("pointer issue in simulate_fo_fixed\n");
+      exit(1);
+    }	
     n_running = particle_cycle_fo(pq, &p, &sim->B_data, cycle);
 #endif    
 }
