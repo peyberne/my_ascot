@@ -261,6 +261,7 @@ typedef struct {
                                               currently simulated (1) or not  */
     a5err err[NSIMD] __memalign__;       /**< Error flag, zero if no error    */
     integer index[NSIMD] __memalign__;   /**< Marker index at marker queue    */
+    int initialIndex[NSIMD] __memalign__;       /**< initial index before packing */
 } particle_simd_fo;
 
 /**

@@ -30,7 +30,7 @@
 #pragma omp declare simd uniform(sim)
 real simulate_fo_fixed_inidt(sim_data* sim, particle_simd_fo* p, int i);
 
-real simulate_fo_fixed_copy_to_gpu(sim_data* sim, particle_simd_fo *p_ptr, particle_simd_fo *p0_ptr, B_field_data* Bdata, E_field_data* Edata, particle_loc*  p_loc, real* hin, real* rnd, int* ps, int* sort_index, particle_simd_fo *pbis_ptr, particle_simd_fo *p0bis_ptr, real* hinbis);
+real simulate_fo_fixed_copy_to_gpu(sim_data* sim, particle_simd_fo *p_ptr, particle_simd_fo *p0_ptr, B_field_data* Bdata, E_field_data* Edata, particle_loc*  p_loc, real* hin, real* rnd, int* ps, int* sort_index, particle_simd_fo *pbis_ptr, real* hinbis);
 
 real simulate_fo_fixed_copy_from_gpu(sim_data* sim, particle_simd_fo *p_ptr, particle_simd_fo *pbis_ptr);
 
@@ -68,11 +68,11 @@ void simulate_fo_fixed(particle_queue* pq, sim_data* sim) {
     particle_simd_fo p;  // This array holds current states
     particle_simd_fo p0; // This array stores previous states
     particle_simd_fo pbis;  // This array holds current states                                                                                                                                                                                            
-    particle_simd_fo p0bis; // This array stores previous states      
     /* Init dummy markers */
     for(int i=0; i< NSIMD; i++) {
         p.id[i] = -1;
         p.running[i] = 0;
+        p.initialIndex[i] = i;
     }
 
     /* Initialize running particles */
@@ -101,7 +101,6 @@ void simulate_fo_fixed(particle_queue* pq, sim_data* sim) {
     particle_simd_fo *p_ptr=&p;
     particle_simd_fo *p0_ptr=&p0;
     particle_simd_fo *pbis_ptr=&pbis;
-    particle_simd_fo *p0bis_ptr=&p0bis;
     B_field_data* Bdata = &sim->B_data;
     E_field_data* Edata = &sim->E_data;
     real* hin_ptr = hin;    
@@ -116,10 +115,12 @@ void simulate_fo_fixed(particle_queue* pq, sim_data* sim) {
     real rnd[3*NSIMD];
     
 #ifdef GPU
-    simulate_fo_fixed_copy_to_gpu(sim, p_ptr, p0_ptr, Bdata, Edata, &p_loc, hin, rnd, ps, sort_index, pbis_ptr, p0bis_ptr,  hinbis);
+    simulate_fo_fixed_copy_to_gpu(sim, p_ptr, p0_ptr, Bdata, Edata, &p_loc, hin, rnd, ps, sort_index, pbis_ptr, hinbis);
     int n_running_ref = n_running;
     int packing = 0;
     int ipack = 0;
+    particle_simd_fo *p_tmp_ptr;
+    real* hin_tmp_ptr;
 #endif
     while(n_running > 0) {
         /* Store marker states */
@@ -250,7 +251,7 @@ void simulate_fo_fixed(particle_queue* pq, sim_data* sim) {
 
         /* Update, sort and pack running particles */
 #ifdef GPU
-	if ((n_running_ref - n_running) > 0.001*NSIMD  ) {
+	if ((n_running_ref - n_running) > 1*NSIMD  ) {
 	  packing = 1;
 	  n_running_ref = n_running;
 	}
@@ -274,7 +275,6 @@ void simulate_fo_fixed(particle_queue* pq, sim_data* sim) {
 	    {
 	      int i = sort_index[iloc];
 	      particle_copy_fo(p_ptr, i, pbis_ptr, iloc);
-	      particle_copy_fo(p0_ptr, i, p0bis_ptr, iloc);
 	      //hinbis_ptr[iloc] = hin_ptr[i];
 	      //use this to circumvent nvhpc compiler bug 
 	      hin_copy_fo(hin_ptr, i, hinbis_ptr, iloc);
@@ -304,19 +304,33 @@ void simulate_fo_fixed(particle_queue* pq, sim_data* sim) {
 	// Swap pointers to particle arrays
 #ifdef GPU
 	if (packing == 1) {
-	  particle_simd_fo *p_tmp_ptr;
-	  real* hin_tmp_ptr;
 	  hin_tmp_ptr = hin_ptr;
 	  hin_ptr = hinbis_ptr;
 	  hinbis_ptr = hin_tmp_ptr;
 	  p_tmp_ptr = p_ptr;
 	  p_ptr = pbis_ptr;
 	  pbis_ptr = p_tmp_ptr;
-	  p_tmp_ptr=p0_ptr;
-	  p0_ptr = p0bis_ptr;
-	  p0bis_ptr = p_tmp_ptr;
 	  
 	  packing = 0;
+	}
+	if (n_running == 0) {
+	  GPU_PARALLEL_LOOP_ALL_LEVELS
+	  for(int iloc = 0; iloc < NSIMD; iloc++)
+	    {
+	      sort_index[iloc] = p_ptr->initialIndex[iloc];
+	    }
+	  
+	  GPU_PARALLEL_LOOP_ALL_LEVELS
+          for(int iloc = 0; iloc < NSIMD; iloc++)
+	    {
+	      int i = sort_index[iloc];
+	      particle_copy_fo(p_ptr, iloc, pbis_ptr, i);
+	      //use this to circumvent nvhpc compiler bug                                                                                                                                                                                                   
+	      hin_copy_fo(hin_ptr, iloc, hinbis_ptr, i);
+	    }
+	  p_tmp_ptr = p_ptr;
+	  p_ptr = pbis_ptr;
+	  pbis_ptr = p_tmp_ptr;
 	}
 #endif
     }
@@ -324,7 +338,6 @@ void simulate_fo_fixed(particle_queue* pq, sim_data* sim) {
     
 #ifdef GPU
     simulate_fo_fixed_copy_from_gpu(sim, p_ptr, pbis_ptr);
-    particle_simd_fo *p_tmp_ptr;
     if (p_ptr == &p) {
       p_tmp_ptr = &p;
       printf("p is used\n");
@@ -379,7 +392,7 @@ real simulate_fo_fixed_inidt(sim_data* sim, particle_simd_fo* p, int i) {
 }
 
 
-real simulate_fo_fixed_copy_to_gpu(sim_data* sim, particle_simd_fo *p_ptr, particle_simd_fo *p0_ptr, B_field_data* Bdata, E_field_data* Edata, particle_loc*  p_loc, real* hin, real* rnd, int* ps, int* sort_index, particle_simd_fo *pbis_ptr, particle_simd_fo *p0bis_ptr, real* hinbis) {
+real simulate_fo_fixed_copy_to_gpu(sim_data* sim, particle_simd_fo *p_ptr, particle_simd_fo *p0_ptr, B_field_data* Bdata, E_field_data* Edata, particle_loc*  p_loc, real* hin, real* rnd, int* ps, int* sort_index, particle_simd_fo *pbis_ptr, real* hinbis) {
 
   GPU_MAP_TO_DEVICE(
 		      p_loc[0:1],\
@@ -430,6 +443,7 @@ real simulate_fo_fixed_copy_to_gpu(sim_data* sim, particle_simd_fo *p_ptr, parti
 		      p_ptr->endcond        [0:NSIMD],\
 		      p_ptr->walltile       [0:NSIMD],\
 		      p_ptr->index          [0:NSIMD],\
+		      p_ptr->initialIndex   [0:NSIMD],\
 		      p_ptr->znum           [0:NSIMD],\
 		      p_ptr->anum           [0:NSIMD],\
 		      p_ptr->bounces        [0:NSIMD],\
@@ -466,6 +480,7 @@ real simulate_fo_fixed_copy_to_gpu(sim_data* sim, particle_simd_fo *p_ptr, parti
 		      pbis_ptr->endcond     [0:NSIMD],\
 		      pbis_ptr->walltile    [0:NSIMD],\
 		      pbis_ptr->index       [0:NSIMD],\
+		      pbis_ptr->initialIndex[0:NSIMD],\
 		      pbis_ptr->znum        [0:NSIMD],\
 		      pbis_ptr->anum        [0:NSIMD],\
 		      pbis_ptr->bounces     [0:NSIMD],\
@@ -502,45 +517,10 @@ real simulate_fo_fixed_copy_to_gpu(sim_data* sim, particle_simd_fo *p_ptr, parti
 		      p0_ptr->endcond       [0:NSIMD],\
 		      p0_ptr->walltile      [0:NSIMD],\
 		      p0_ptr->index         [0:NSIMD],\
+		      p0_ptr->initialIndex  [0:NSIMD],\
 		      p0_ptr->znum          [0:NSIMD],\
 		      p0_ptr->anum          [0:NSIMD],\
 		      p0_ptr->bounces       [0:NSIMD],\
-  		      p0bis_ptr[0:1],\
-		      p0bis_ptr->running    [0:NSIMD],\
-		      p0bis_ptr->r          [0:NSIMD],\
-		      p0bis_ptr->phi        [0:NSIMD],\
-		      p0bis_ptr->p_r        [0:NSIMD],\
-		      p0bis_ptr->p_phi      [0:NSIMD],\
-		      p0bis_ptr->p_z        [0:NSIMD],\
-		      p0bis_ptr->mileage    [0:NSIMD],\
-		      p0bis_ptr->z          [0:NSIMD],\
-		      p0bis_ptr->charge     [0:NSIMD],\
-		      p0bis_ptr->mass       [0:NSIMD],\
-		      p0bis_ptr->B_r        [0:NSIMD],\
-		      p0bis_ptr->B_r_dr     [0:NSIMD],\
-		      p0bis_ptr->B_r_dphi   [0:NSIMD],\
-		      p0bis_ptr->B_r_dz     [0:NSIMD],\
-		      p0bis_ptr->B_phi      [0:NSIMD],\
-		      p0bis_ptr->B_phi_dr   [0:NSIMD],\
-		      p0bis_ptr->B_phi_dphi [0:NSIMD],\
-		      p0bis_ptr->B_phi_dz   [0:NSIMD],\
-		      p0bis_ptr->B_z        [0:NSIMD],\
-		      p0bis_ptr->B_z_dr     [0:NSIMD],\
-		      p0bis_ptr->B_z_dphi   [0:NSIMD],\
-		      p0bis_ptr->B_z_dz     [0:NSIMD],\
-		      p0bis_ptr->rho        [0:NSIMD],\
-		      p0bis_ptr->theta      [0:NSIMD],\
-		      p0bis_ptr->err        [0:NSIMD],\
-		      p0bis_ptr->time       [0:NSIMD],\
-		      p0bis_ptr->weight     [0:NSIMD],\
-		      p0bis_ptr->cputime    [0:NSIMD],\
-		      p0bis_ptr->id         [0:NSIMD],\
-		      p0bis_ptr->endcond    [0:NSIMD],\
-		      p0bis_ptr->walltile   [0:NSIMD],\
-		      p0bis_ptr->index      [0:NSIMD],\
-		      p0bis_ptr->znum       [0:NSIMD],\
-		      p0bis_ptr->anum       [0:NSIMD],\
-		      p0bis_ptr->bounces    [0:NSIMD],\
 		      hin[0:NSIMD],\
 		      hinbis[0:NSIMD],\
        		      sim[0:1],		\
@@ -601,16 +581,80 @@ GPU_MAP_TO_DEVICE(
 real simulate_fo_fixed_copy_from_gpu(sim_data* sim, particle_simd_fo *p_ptr, particle_simd_fo *pbis_ptr){
 
   GPU_UPDATE_FROM_DEVICE(
-      p_ptr[0:1],p_ptr->running[0:NSIMD],p_ptr->r[0:NSIMD],p_ptr->phi[0:NSIMD],p_ptr->p_r[0:NSIMD],p_ptr->p_phi[0:NSIMD],p_ptr->p_z[0:NSIMD],p_ptr->mileage[0:NSIMD], \
-  p_ptr->z[0:NSIMD],p_ptr->charge[0:NSIMD],p_ptr->mass[0:NSIMD],p_ptr->B_r[0:NSIMD],p_ptr->B_r_dr[0:NSIMD],p_ptr->B_r_dphi[0:NSIMD],p_ptr->B_r_dz[0:NSIMD], \
-  p_ptr->B_phi[0:NSIMD],p_ptr->B_phi_dr[0:NSIMD],p_ptr->B_phi_dphi[0:NSIMD],p_ptr->B_phi_dz[0:NSIMD],p_ptr->B_z[0:NSIMD],p_ptr->B_z_dr[0:NSIMD],p_ptr->B_z_dphi[0:NSIMD], \
-  p_ptr->B_z_dz[0:NSIMD],p_ptr->rho[0:NSIMD],p_ptr->theta[0:NSIMD],p_ptr->err[0:NSIMD],p_ptr->time[0:NSIMD],p_ptr->weight[0:NSIMD],p_ptr->cputime[0:NSIMD], \
-      p_ptr->id[0:NSIMD],p_ptr->endcond[0:NSIMD],p_ptr->walltile[0:NSIMD],p_ptr->index[0:NSIMD],p_ptr->znum[0:NSIMD],p_ptr->anum[0:NSIMD],p_ptr->bounces[0:NSIMD], \
-      pbis_ptr[0:1],pbis_ptr->running[0:NSIMD],pbis_ptr->r[0:NSIMD],pbis_ptr->phi[0:NSIMD],pbis_ptr->p_r[0:NSIMD],pbis_ptr->p_phi[0:NSIMD],pbis_ptr->p_z[0:NSIMD],pbis_ptr->mileage[0:NSIMD],\
-  pbis_ptr->z[0:NSIMD],pbis_ptr->charge[0:NSIMD],pbis_ptr->mass[0:NSIMD],pbis_ptr->B_r[0:NSIMD],pbis_ptr->B_r_dr[0:NSIMD],pbis_ptr->B_r_dphi[0:NSIMD],pbis_ptr->B_r_dz[0:NSIMD], \
-  pbis_ptr->B_phi[0:NSIMD],pbis_ptr->B_phi_dr[0:NSIMD],pbis_ptr->B_phi_dphi[0:NSIMD],pbis_ptr->B_phi_dz[0:NSIMD],pbis_ptr->B_z[0:NSIMD],pbis_ptr->B_z_dr[0:NSIMD],pbis_ptr->B_z_dphi[0:NSIMD], \
-  pbis_ptr->B_z_dz[0:NSIMD],pbis_ptr->rho[0:NSIMD],pbis_ptr->theta[0:NSIMD],pbis_ptr->err[0:NSIMD],pbis_ptr->time[0:NSIMD],pbis_ptr->weight[0:NSIMD],pbis_ptr->cputime[0:NSIMD], \
-      pbis_ptr->id[0:NSIMD],pbis_ptr->endcond[0:NSIMD],pbis_ptr->walltile[0:NSIMD],pbis_ptr->index[0:NSIMD],pbis_ptr->znum[0:NSIMD],pbis_ptr->anum[0:NSIMD],pbis_ptr->bounces[0:NSIMD] )
+  		      p_ptr[0:1],\
+		      p_ptr->running        [0:NSIMD],\
+		      p_ptr->r              [0:NSIMD],\
+		      p_ptr->phi            [0:NSIMD],\
+		      p_ptr->p_r            [0:NSIMD],\
+		      p_ptr->p_phi          [0:NSIMD],\
+		      p_ptr->p_z            [0:NSIMD],\
+		      p_ptr->mileage        [0:NSIMD],\
+		      p_ptr->z              [0:NSIMD],\
+		      p_ptr->charge         [0:NSIMD],\
+		      p_ptr->mass           [0:NSIMD],\
+		      p_ptr->B_r            [0:NSIMD],\
+		      p_ptr->B_r_dr         [0:NSIMD],\
+		      p_ptr->B_r_dphi       [0:NSIMD],\
+		      p_ptr->B_r_dz         [0:NSIMD],\
+		      p_ptr->B_phi          [0:NSIMD],\
+		      p_ptr->B_phi_dr       [0:NSIMD],\
+		      p_ptr->B_phi_dphi     [0:NSIMD],\
+		      p_ptr->B_phi_dz       [0:NSIMD],\
+		      p_ptr->B_z            [0:NSIMD],\
+		      p_ptr->B_z_dr         [0:NSIMD],\
+		      p_ptr->B_z_dphi       [0:NSIMD],\
+		      p_ptr->B_z_dz         [0:NSIMD],\
+		      p_ptr->rho            [0:NSIMD],\
+		      p_ptr->theta          [0:NSIMD],\
+		      p_ptr->err            [0:NSIMD],\
+		      p_ptr->time           [0:NSIMD],\
+		      p_ptr->weight         [0:NSIMD],\
+		      p_ptr->cputime        [0:NSIMD],\
+		      p_ptr->id             [0:NSIMD],\
+		      p_ptr->endcond        [0:NSIMD],\
+		      p_ptr->walltile       [0:NSIMD],\
+		      p_ptr->index          [0:NSIMD],\
+		      p_ptr->initialIndex   [0:NSIMD],\
+		      p_ptr->znum           [0:NSIMD],\
+		      p_ptr->anum           [0:NSIMD],\
+		      p_ptr->bounces        [0:NSIMD],\
+  		      pbis_ptr[0:1],                  \
+		      pbis_ptr->running     [0:NSIMD],\
+		      pbis_ptr->r           [0:NSIMD],\
+		      pbis_ptr->phi         [0:NSIMD],\
+		      pbis_ptr->p_r         [0:NSIMD],\
+		      pbis_ptr->p_phi       [0:NSIMD],\
+		      pbis_ptr->p_z         [0:NSIMD],\
+		      pbis_ptr->mileage     [0:NSIMD],\
+		      pbis_ptr->z           [0:NSIMD],\
+		      pbis_ptr->charge      [0:NSIMD],\
+		      pbis_ptr->mass        [0:NSIMD],\
+		      pbis_ptr->B_r         [0:NSIMD],\
+		      pbis_ptr->B_r_dr      [0:NSIMD],\
+		      pbis_ptr->B_r_dphi    [0:NSIMD],\
+		      pbis_ptr->B_r_dz      [0:NSIMD],\
+		      pbis_ptr->B_phi       [0:NSIMD],\
+		      pbis_ptr->B_phi_dr    [0:NSIMD],\
+		      pbis_ptr->B_phi_dphi  [0:NSIMD],\
+		      pbis_ptr->B_phi_dz    [0:NSIMD],\
+		      pbis_ptr->B_z         [0:NSIMD],\
+		      pbis_ptr->B_z_dr      [0:NSIMD],\
+		      pbis_ptr->B_z_dphi    [0:NSIMD],\
+		      pbis_ptr->B_z_dz      [0:NSIMD],\
+		      pbis_ptr->rho         [0:NSIMD],\
+		      pbis_ptr->theta       [0:NSIMD],\
+		      pbis_ptr->err         [0:NSIMD],\
+		      pbis_ptr->time        [0:NSIMD],\
+		      pbis_ptr->weight      [0:NSIMD],\
+		      pbis_ptr->cputime     [0:NSIMD],\
+		      pbis_ptr->id          [0:NSIMD],\
+		      pbis_ptr->endcond     [0:NSIMD],\
+		      pbis_ptr->walltile    [0:NSIMD],\
+		      pbis_ptr->index       [0:NSIMD],\
+		      pbis_ptr->initialIndex[0:NSIMD],\
+		      pbis_ptr->znum        [0:NSIMD],\
+		      pbis_ptr->anum        [0:NSIMD],\
+		      pbis_ptr->bounces     [0:NSIMD] )
 
     GPU_MAP_FROM_DEVICE(
 			      sim[0:1]  )
