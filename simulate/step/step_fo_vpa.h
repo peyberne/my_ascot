@@ -10,8 +10,10 @@
 #include "../../mhd.h"
 #include "../../particle.h"
 
+DECLARE_TARGET_LTOP
 void step_fo_vpa(particle_simd_fo* p, real* h, B_field_data* Bdata,
                  E_field_data* Edata);
+DECLARE_TARGET_LTOP_END
 void step_fo_vpa_mhd(particle_simd_fo* p, real* h, B_field_data* Bdata,
                      E_field_data* Edata, boozer_data* boozer, mhd_data* mhd);
 

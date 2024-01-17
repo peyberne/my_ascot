@@ -122,9 +122,9 @@ void dist_5D_update_fo(dist_5D_data* dist, particle_simd_fo* p_f,
     real* weight = p_loc->r_arr4;
 
     //#pragma omp simd
-#pragma acc data present(phi[0:NSIMD],ppara[0:NSIMD],pperp[0:NSIMD],i_r[0:NSIMD],i_phi[0:NSIMD],i_z[0:NSIMD],i_ppara[0:NSIMD],i_pperp[0:NSIMD],i_time[0:NSIMD],i_q[0:NSIMD],ok[0:NSIMD],weight[0:NSIMD])
+/* #pragma acc data present(phi[0:NSIMD],ppara[0:NSIMD],pperp[0:NSIMD],i_r[0:NSIMD],i_phi[0:NSIMD],i_z[0:NSIMD],i_ppara[0:NSIMD],i_pperp[0:NSIMD],i_time[0:NSIMD],i_q[0:NSIMD],ok[0:NSIMD],weight[0:NSIMD]) */
     {
-    GPU_PARALLEL_LOOP_ALL_LEVELS
+    GPU_LOOP_LBOT
     for(int i = 0; i < NSIMD; i++) {
         if(p_f->running[i]) {
             i_r[i] = floor((p_f->r[i] - dist->min_r)
@@ -179,7 +179,7 @@ void dist_5D_update_fo(dist_5D_data* dist, particle_simd_fo* p_f,
         }
     }
 
-    GPU_PARALLEL_LOOP_ALL_LEVELS
+    GPU_LOOP_LBOT
     for(int i = 0; i < NSIMD; i++) {
         if(p_f->running[i] && ok[i]) {
             unsigned long index = dist_5D_index(i_r[i], i_phi[i], i_z[i],

@@ -189,12 +189,12 @@ int main(int argc, char** argv) {
         goto CLEANUP_FAILURE;
     }
 
-#ifdef GPU
-    if (nprts != NSIMD) {
-      printf("With GPU=1, NSIMD has to be equal to the number of markers = %d\n",nprts);
-      exit(1);
-    }
-#endif
+/* #ifdef GPU */
+/*     if (nprts != NSIMD) { */
+/*       printf("With GPU=1, NSIMD has to be equal to the number of markers = %d\n",nprts); */
+/*       exit(1); */
+/*     } */
+/* #endif */
 
     /* Combine input offload arrays to one */
     offload_package offload_data;

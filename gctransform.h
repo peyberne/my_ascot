@@ -10,11 +10,16 @@
 
 void gctransform_setorder(int order);
 
+#ifndef GPU
 #pragma omp declare simd
+#else
+DECLARE_TARGET
+#endif
 void gctransform_particle2guidingcenter(
     real mass, real charge, real* B_dB,
     real r, real phi, real z, real pr, real pphi, real pz,
     real* R, real* Phi, real* Z, real* ppar, real* mu, real* zeta);
+DECLARE_TARGET_END
 
 #pragma omp declare simd
 void gctransform_guidingcenter2particle(

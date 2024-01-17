@@ -431,12 +431,22 @@ int particle_cycle_ml(particle_queue* q, particle_simd_ml* p,
 void particle_input_to_state(input_particle* p, particle_state* ps,
                              B_field_data* Bdata);
 
+#ifndef GPU
 #pragma omp declare simd uniform(Bdata)
+#else
+DECLARE_TARGET
+#endif
 a5err particle_state_to_fo(particle_state* p, int i, particle_simd_fo* p_fo,
                            int j, B_field_data* Bdata);
+DECLARE_TARGET_END
+#ifndef GPU
 #pragma omp declare simd uniform(Bdata)
+#else
+DECLARE_TARGET
+#endif
 void particle_fo_to_state(particle_simd_fo* p_fo, int j, particle_state* p,
                           B_field_data* Bdata);
+DECLARE_TARGET_END
 #pragma omp declare simd uniform(Bdata)
 a5err particle_state_to_gc(particle_state* p, int i, particle_simd_gc* p_gc,
                            int j, B_field_data* Bdata);
@@ -450,8 +460,10 @@ a5err particle_state_to_ml(particle_state* p, int i, particle_simd_ml* p_ml,
 void particle_ml_to_state(particle_simd_ml* p_ml, int j, particle_state* p,
                           B_field_data* Bdata);
 #pragma omp declare simd uniform(p_fo,Bdata)
+DECLARE_TARGET_LTOP
 int particle_fo_to_gc(particle_simd_fo* p_fo, int j, particle_simd_gc* p_gc,
                       B_field_data* Bdata);
+DECLARE_TARGET_LTOP_END
 #ifndef GPU
 #pragma omp declare simd
 #else

@@ -88,7 +88,7 @@ void dist_COM_update_fo(dist_COM_data* dist, B_field_data* Bdata,
 //    #pragma omp simd
 #pragma acc data present(weight[0:NSIMD],i_mu[0:NSIMD],i_Ekin[0:NSIMD],i_Ptor[0:NSIMD],ok[0:NSIMD] )
     {
-    GPU_PARALLEL_LOOP_ALL_LEVELS  
+    GPU_LOOP_LBOT
     for(int i = 0; i < NSIMD; i++) {
         if(p_f->running[i]) {
 
@@ -127,7 +127,7 @@ void dist_COM_update_fo(dist_COM_data* dist, B_field_data* Bdata,
         }
     }
 
-    GPU_PARALLEL_LOOP_ALL_LEVELS
+    GPU_LOOP_LBOT
     for(int i = 0; i < NSIMD; i++) {
         if(p_f->running[i] && ok[i]) {
             unsigned long index = dist_COM_index(i_mu[i], i_Ekin[i], i_Ptor[i],

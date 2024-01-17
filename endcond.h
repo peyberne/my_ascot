@@ -33,8 +33,10 @@ enum {
 
 void endcond_check_gc(particle_simd_gc* p_f, particle_simd_gc* p_i,
                       sim_data* sim);
+DECLARE_TARGET_LTOP
 void endcond_check_fo(particle_simd_fo* p_f, particle_simd_fo* p_i,
                       sim_data* sim);
+DECLARE_TARGET_LTOP_END
 void endcond_check_ml(particle_simd_ml* p_f, particle_simd_ml* p_i,
                       sim_data* sim);
 

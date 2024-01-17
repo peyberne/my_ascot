@@ -55,8 +55,10 @@ void diag_transcoef_init(diag_transcoef_data* data,
 
 void diag_transcoef_free(diag_transcoef_data* data);
 
+DECLARE_TARGET_LTOP
 void diag_transcoef_update_fo(diag_transcoef_data* data,
                               particle_simd_fo* p_f, particle_simd_fo* p_i);
+DECLARE_TARGET_LTOP_END
 
 void diag_transcoef_update_gc(diag_transcoef_data* data,
                               particle_simd_gc* p_f, particle_simd_gc* p_i);

@@ -88,7 +88,7 @@ void endcond_check_fo(particle_simd_fo* p_f, particle_simd_fo* p_i,
     int active_ioniz     = sim->endcond_active & endcond_ioniz;
 
     //#pragma omp simd
-    GPU_PARALLEL_LOOP_ALL_LEVELS
+    GPU_LOOP_LBOT
     for(int i = 0; i < NSIMD; i++) {
         if(p_f->running[i]) {
 
@@ -113,9 +113,9 @@ void endcond_check_fo(particle_simd_fo* p_f, particle_simd_fo* p_i,
             }
 
             /* Check if the marker time exceeds simulation time */
-            if(active_tlim) {
-                if(!sim->reverse_time && p_f->time[i] > sim->endcond_lim_simtime) {
-                    p_f->endcond[i] |= endcond_tlim;
+            //if(active_tlim) {
+	      if(!sim->reverse_time && p_f->time[i] > sim->endcond_lim_simtime) {
+		p_f->endcond[i] |= endcond_tlim;
                     p_f->running[i] = 0;
                 }
                 if(sim->reverse_time && p_f->time[i] < sim->endcond_lim_simtime) {
@@ -126,7 +126,7 @@ void endcond_check_fo(particle_simd_fo* p_f, particle_simd_fo* p_i,
                     p_f->endcond[i] |= endcond_tlim;
                     p_f->running[i] = 0;
                 }
-            }
+		//}
 
             /* Check, using the wall collision module, whether marker hit wall
              * during this time-step. Store the wall element ID if it did. */
@@ -218,14 +218,14 @@ void endcond_check_fo(particle_simd_fo* p_f, particle_simd_fo* p_i,
                 p_f->running[i] = 0;
             }
 
-            /* Check if the time spent simulating this marker exceeds the
-             * given limit*/
-            if(active_cpumax) {
-                if(p_f->cputime[i] > sim->endcond_max_cputime) {
-                    p_f->endcond[i] |= endcond_cpumax;
-                    p_f->running[i] = 0;
-                }
-            }
+            /* /\* Check if the time spent simulating this marker exceeds the */
+            /*  * given limit*\/ */
+            /* if(active_cpumax) { */
+            /*     if(p_f->cputime[i] > sim->endcond_max_cputime) { */
+            /*         p_f->endcond[i] |= endcond_cpumax; */
+            /*         p_f->running[i] = 0; */
+            /*     } */
+            /* } */
 
             /* Check if the particle has been neutralized */
             if(active_neutr) {

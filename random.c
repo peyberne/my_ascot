@@ -117,7 +117,7 @@ void random_lcg_normal_simd(random_data* rdata, int n, double* r) {
     //#ifdef SIMD
     //    #pragma omp simd
     //#endif
-    GPU_PARALLEL_LOOP_ALL_LEVELS
+    GPU_LOOP_LBOT
     for(int i = 0; i < n; i=i+2) {
         w = 2.0;
         while( w >= 1.0 ) {
@@ -138,7 +138,7 @@ void random_lcg_normal_simd(random_data* rdata, int n, double* r) {
     //#ifdef SIMD
     //    #pragma omp simd
     //#endif
-  GPU_PARALLEL_LOOP_ALL_LEVELS
+    GPU_LOOP_LBOT
     for(int i = 0; i < n; i=i+2) {
         x1 = random_lcg_uniform(rdata);
         x2 = random_lcg_uniform(rdata);

@@ -109,8 +109,13 @@
 /** @brief Convert radians to degrees */
 #define math_rad2deg(a) (a * math_raddeg)
 
+#ifndef GPU
 #pragma omp declare simd
+#else
+DECLARE_TARGET
+#endif
 void math_jac_rpz2xyz(real* rpz, real* xyz, real r, real phi);
+DECLARE_TARGET_END
 #ifndef GPU
 #pragma omp declare simd
 #else

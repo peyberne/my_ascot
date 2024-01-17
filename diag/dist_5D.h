@@ -83,8 +83,10 @@ unsigned long dist_5D_index(int i_r, int i_phi, int i_z, int i_ppara,
 void dist_5D_init(dist_5D_data* dist_data,
                   dist_5D_offload_data* offload_data,
                   real* offload_array);
+DECLARE_TARGET_LTOP
 void dist_5D_update_fo(dist_5D_data* dist, particle_simd_fo* p_f,
                        particle_simd_fo* p_i, particle_loc* p_loc);
+DECLARE_TARGET_LTOP_END
 void dist_5D_update_gc(dist_5D_data* dist, particle_simd_gc* p_f,
                        particle_simd_gc* p_i);
 

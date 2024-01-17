@@ -36,7 +36,7 @@ void mccc_fo_euler(particle_simd_fo* p, real* h, plasma_data* pdata,
 
     //    #pragma omp simd
     //    GPU_MAP_TO_DEVICE(rnd[0:3*NSIMD])
-    GPU_PARALLEL_LOOP_ALL_LEVELS
+    GPU_LOOP_LBOT
     for(int i = 0; i < NSIMD; i++) {
         if(p->running[i]) {
             a5err errflag = 0;

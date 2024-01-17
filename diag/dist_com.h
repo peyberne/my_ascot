@@ -48,8 +48,10 @@ typedef struct {
 void dist_COM_init(dist_COM_data* dist_data,
                    dist_COM_offload_data* offload_data,
                    real* offload_array);
+DECLARE_TARGET_LTOP
 void dist_COM_update_fo(dist_COM_data* dist, B_field_data*Bdata,
                         particle_simd_fo* p_f, particle_simd_fo* p_i, particle_loc* p_loc);
+DECLARE_TARGET_LTOP_END
 void dist_COM_update_gc(dist_COM_data* dist, B_field_data* Bdata,
                         particle_simd_gc* p_f, particle_simd_gc* p_i);
 
