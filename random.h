@@ -73,7 +73,9 @@ double random_lcg_normal(random_data* rdata);
 DECLARE_TARGET
 void random_lcg_uniform_simd(random_data* rdata, int n, double* r);
 DECLARE_TARGET_END
+DECLARE_TARGET
 void random_lcg_normal_simd(random_data* rdata, int n, double* r);
+DECLARE_TARGET_END
 
 #define random_init(data, seed) random_lcg_init(data, seed)
 #define random_uniform(data) random_lcg_uniform(data)

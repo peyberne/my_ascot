@@ -34,6 +34,8 @@ real simulate_fo_fixed_copy_to_gpu(sim_data* sim, particle_simd_fo *p_ptr, parti
 
 real simulate_fo_fixed_history_copy_to_gpu(sim_data* sim, B_field_data* Bdata, E_field_data* Edata, particle_queue* pq);
 
+real simulate_fo_fixed_history_copy_from_gpu(sim_data* sim, particle_queue* pq);
+
 real simulate_fo_fixed_copy_from_gpu(sim_data* sim, particle_simd_fo *p_ptr);
 
 /**
@@ -279,10 +281,9 @@ void simulate_fo_fixed(particle_queue* pq, sim_data* sim) {
 	
       } //for iprt
     /* All markers simulated! */
-    /* #ifdef GPU */
-    /* simulate_fo_fixed_copy_history_from_gpu(sim, p_ptr); */
-    /* n_running = particle_cycle_fo(pq, &p, &sim->B_data, cycle); */
-    /* #endif     */
+#ifdef GPU
+    simulate_fo_fixed_history_copy_from_gpu(sim, pq);
+#endif
 }
 
 /**
@@ -470,6 +471,7 @@ real simulate_fo_fixed_history_copy_to_gpu(sim_data* sim, B_field_data* Bdata, E
   GPU_MAP_TO_DEVICE(
 		      pq[0:1],\
 		      pq->p[0:pq->n],\
+		      pq->p[0:pq->n][0:1],      \
        		      sim[0:1],		\
 		      sim->diag_data.dist5D.histogram[0:sim->diag_data.dist5D.n_r * sim->diag_data.dist5D.n_phi * sim->diag_data.dist5D.n_z * sim->diag_data.dist5D.n_ppara * sim->diag_data.dist5D.n_pperp * sim->diag_data.dist5D.n_time * sim->diag_data.dist5D.n_q], \
 		      sim->diag_data.dist6D.histogram[0:sim->diag_data.dist6D.n_r * sim->diag_data.dist6D.n_phi * sim->diag_data.dist6D.n_z * sim->diag_data.dist6D.n_pr * sim->diag_data.dist6D.n_pphi * sim->diag_data.dist6D.n_pz * sim->diag_data.dist6D.n_time * sim->diag_data.dist6D.n_q], \
@@ -534,12 +536,13 @@ real simulate_fo_fixed_copy_from_gpu(sim_data* sim, particle_simd_fo *p_ptr){
       p_ptr->id[0:NSIMD],p_ptr->endcond[0:NSIMD],p_ptr->walltile[0:NSIMD],p_ptr->index[0:NSIMD],p_ptr->znum[0:NSIMD],p_ptr->anum[0:NSIMD],p_ptr->bounces[0:NSIMD] )
 
     GPU_MAP_FROM_DEVICE(
-			      sim[0:1]  )
+		      sim[0:1]  )
 }
 
-real simulate_fo_fixed_history_copy_from_gpu(sim_data* sim){
+real simulate_fo_fixed_history_copy_from_gpu(sim_data* sim, particle_queue* pq){
 
 
   GPU_MAP_FROM_DEVICE(
-			      sim[0:1]  )
+		      pq->p[0:pq->n][0:1],      \
+		      sim[0:1]  )
 }
