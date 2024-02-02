@@ -224,11 +224,11 @@ void diag_free(diag_data* data) {
  */
 void diag_update_fo(diag_data* data, B_field_data* Bdata, particle_simd_fo* p_f,
                     particle_simd_fo* p_i, particle_loc* p_loc) {
-#ifndef  GPU
-    if(data->diagorb_collect) {
-        diag_orb_update_fo(&data->diagorb, p_f, p_i);
-    }
-#endif
+/* #ifndef  GPU */
+/*     if(data->diagorb_collect) { */
+/*         diag_orb_update_fo(&data->diagorb, p_f, p_i); */
+/*     } */
+/* #endif */
     if(data->dist5D_collect) {
         dist_5D_update_fo(&data->dist5D, p_f, p_i, p_loc);
     }

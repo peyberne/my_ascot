@@ -8,6 +8,8 @@
 #define DECLARE_TARGET     
 #define DECLARE_TARGET_END 
 #define DECLARE_TARGET_COPYIN
+#define DECLARE_TARGET_LTOP     
+#define DECLARE_TARGET_LTOP_END 
 #define GPU_MAP_TO_DEVICE(x ...) 
 #define GPU_UPDATE_FROM_DEVICE(x ...) 
 #define GPU_MAP_FROM_DEVICE(x ...)
@@ -15,6 +17,7 @@
 #define GPU_ATOMIC MY_PRAGMA(omp atomic)
 //#define OMP_L1 MY_PRAGMA(omp distribute parallel for) 
 #ifdef _OPENMP
+#ifdef GPU
 #define GPU_PARALLEL_LOOP_ALL_LEVELS MY_PRAGMA(omp target teams distribute parallel for simd )
 #define GPU_PARALLEL_LOOP_ALL_LEVELS_REDUCTION(x ...) MY_PRAGMA(omp target teams distribute parallel for simd reduction(+:x))
 //#define GPU_PARALLEL_LOOP_ALL_LEVELS 
@@ -25,6 +28,13 @@
 #define GPU_MAP_FROM_DEVICE(x ...) MY_PRAGMA(omp target exit data map (from: x))
 #define GPU_MAP_DELETE_DEVICE(x ...)  MY_PRAGMA(omp target exit data (delete: x))
 #define GPU_ATOMIC MY_PRAGMA(acc atomic)
+#else
+
+#define GPU_LOOP_LTOP MY_PRAGMA(omp parallel for)
+#define GPU_LOOP_LBOT MY_PRAGMA(omp simd)
+#define GPU_LOOP_LBOT_REDUCTION(x ...) MY_PRAGMA(omp simd reduction(+:x)) 
+
+#endif
 #endif
 #ifdef _OPENACC
 #warning "OpenACC"

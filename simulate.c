@@ -183,9 +183,9 @@ void simulate(
     /*    progress, if monitoring is active.                                  */
     /*                                                                        */
     /**************************************************************************/
-    #pragma omp parallel sections num_threads(2)
+    //    #pragma omp parallel sections num_threads(2)
     {
-        #pragma omp section
+      //        #pragma omp section
         {
             /******************************************************************/
             /* 5. Other threads execute marker simulation using the mode the  */
@@ -205,7 +205,7 @@ void simulate(
             }
             else if(pq.n > 0 && sim.sim_mode == simulate_mode_fo) {
 
-                #pragma omp parallel
+	      //#pragma omp parallel
                 simulate_fo_fixed(&pq, &sim);
             }
             else if(pq.n > 0 && sim.sim_mode == simulate_mode_ml) {
@@ -215,7 +215,7 @@ void simulate(
             }
         }
 
-        #pragma omp section
+	//        #pragma omp section
         {
 #if VERBOSE > 1
             /* Update progress until simulation is complete.             */

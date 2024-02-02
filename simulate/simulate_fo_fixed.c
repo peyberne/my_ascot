@@ -248,27 +248,27 @@ void simulate_fo_fixed(particle_queue* pq, sim_data* sim) {
 	  }
 	  
 	  /* Update running particles */
-#ifdef GPU
+/* #ifdef GPU */
 	  n_running = 0;
 	  GPU_LOOP_LBOT_REDUCTION(n_running)
 	  for(int i = 0; i < NSIMD; i++)
 	    {
 	      if(p_ptr->running[i] > 0) n_running++;
 	    }
-#else
-	  n_running = particle_cycle_fo(pq, &p, &sim->B_data, cycle);
-#endif
-#ifndef GPU	
-	  /* Determine simulation time-step for new particles */
-	  //#pragma omp simd
-	  GPU_LOOP_LBOT
-	  for(int i = 0; i < NSIMD; i++) {
-	    if(cycle[i] > 0)
-	      {
-		hin[i] = simulate_fo_fixed_inidt(sim, &p, i);
-	      }
-	  }
-#endif	
+/* #else */
+/* 	  n_running = particle_cycle_fo(pq, &p, &sim->B_data, cycle); */
+/* #endif */
+/* #ifndef GPU	 */
+/* 	  /\* Determine simulation time-step for new particles *\/ */
+/* 	  //#pragma omp simd */
+/* 	  GPU_LOOP_LBOT */
+/* 	  for(int i = 0; i < NSIMD; i++) { */
+/* 	    if(cycle[i] > 0) */
+/* 	      { */
+/* 		hin[i] = simulate_fo_fixed_inidt(sim, &p, i); */
+/* 	      } */
+/* 	  } */
+/* #endif	 */
 	}
 	GPU_LOOP_LBOT
 	for(int i = 0; i < NSIMD; i++)
@@ -319,7 +319,7 @@ real simulate_fo_fixed_inidt(sim_data* sim, particle_simd_fo* p, int i) {
     return h;
 }
 
-
+#ifdef GPU
 real simulate_fo_fixed_copy_to_gpu(sim_data* sim, particle_simd_fo *p_ptr, particle_simd_fo *p0_ptr, B_field_data* Bdata, E_field_data* Edata, particle_loc*  p_loc, real* hin, real* rnd) {
 
   GPU_MAP_TO_DEVICE(
@@ -546,3 +546,5 @@ real simulate_fo_fixed_history_copy_from_gpu(sim_data* sim, particle_queue* pq){
 		      pq->p[0:pq->n][0:1],      \
 		      sim[0:1]  )
 }
+
+#endif

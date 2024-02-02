@@ -56,9 +56,7 @@ void random_gsl_normal_simd(random_data* rdata, int n, double* r);
 #elif defined(RANDOM_LCG)
 
 #include <stdint.h>
-#ifdef GPU
 #include "offload_acc_omp.h"
-#endif
 
 typedef struct {
     uint64_t r;

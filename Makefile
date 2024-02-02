@@ -1,4 +1,4 @@
-CC=mpicc 
+CC=icc
 
 
 ifdef TRAP_FPE
@@ -10,8 +10,8 @@ ifdef NSIMD
 	DEFINES+=-DNSIMD=$(NSIMD)
 endif
 
-ifdef GPU
-        DEFINES+=-DGPU
+ifdef TARGET
+    DEFINES+=-DTARGET=$(TARGET)
 endif
 
 ifdef VERBOSE
@@ -26,7 +26,7 @@ endif
 
 ifeq ($(MPI),1)
 	DEFINES+=-DMPI
-	#CC=h5pcc
+	CC=mpiicc
 endif
 
 ifeq ($(RANDOM),MKL)
@@ -44,32 +44,13 @@ endif
 
 ifneq ($(CC),h5cc)
 	ifneq ($(CC),h5pcc)
-		CFLAGS+=-L$(HDF5_ROOT)/lib -lhdf5 -lhdf5_hl -I$(HDF5_ROOT)/include
+                CFLAGS+=-I$(HDF5_ROOT)//include
+                CFLAGS+=-L$(HDF5_ROOT)/lib
+                CFLAGS+=-lhdf5 -lhdf5_hl
 	endif
 endif
 
-ifdef TARGET
-    DEFINES+=-DTARGET=$(TARGET)
-endif
-
-ifeq ($(OMP),1)
-# uncomment this to compile for CPU only without SIMD
-        #CFLAGS+=-fopenmp -foffload=disable
-# uncomment this to compile for CPU only with SIMD
-        #CFLAGS+=-fopenmp -DSIMD -foffload=disable
-# uncomment this to compile for GPU 
-       CFLAGS+=-fopenmp 
-ifeq ($(GPU), 1)
-	CFLAGS+=-foffload="nvptx-none=-latomic"
-        CFLAGS+=-foffload="-mgomp" 
-	CFLAGS+="-g"
-	CFLAGS+=-foffload="-lm"
-else
-	CFLAGS+=-fopenmp -DSIMD -foffload=disable -DNSIMD=8
-endif
-endif
-
-CFLAGS+= -lm -fPIC -std=c11 $(DEFINES) $(FLAGS) #-DFULLMCCC
+CFLAGS+=-Ofast -lm -qopt-zmm-usage=high -march=native  -Wall -qopenmp -fPIC -std=c11 $(DEFINES) $(FLAGS)
 
 # Write CFLAGS and CC to a file to be included into output
 $(shell echo "#define CFLAGS " $(CFLAGS) > compiler_flags.h)

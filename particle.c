@@ -1469,7 +1469,7 @@ void particle_copy_fo(particle_simd_fo* p1, int i, particle_simd_fo* p2, int j) 
         p2->rho[j]        = p1->rho[i];
         p2->weight[j]     = p1->weight[i];
         p2->cputime[j]    = p1->cputime[i];
-        p2->rho[j]        = p1->rho[i];
+        p2->err[j]        = p1->err[i];
         p2->theta[j]      = p1->theta[i];
 
         p2->mass[j]       = p1->mass[i];
